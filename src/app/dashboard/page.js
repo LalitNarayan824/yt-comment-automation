@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { mockComments, mockReplies } from "@/lib/mockData";
 
 export default function DashboardPage() {
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [videoId, setVideoId] = useState("");
     const [comments, setComments] = useState([]);
@@ -14,6 +16,20 @@ export default function DashboardPage() {
     const [posted, setPosted] = useState({});
     const [fetched, setFetched] = useState(false);
 
+    // Redirect to login if not authenticated
+    if (status === "loading") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-yt-light-gray">
+                <div className="text-sm text-yt-gray-text">Loading...</div>
+            </div>
+        );
+    }
+
+    if (status === "unauthenticated") {
+        router.push("/login");
+        return null;
+    }
+
     const handleFetchComments = () => {
         if (!videoId.trim()) return;
         setLoading(true);
@@ -22,7 +38,7 @@ export default function DashboardPage() {
         setReplies({});
         setPosted({});
 
-        // Simulate API call
+        // Simulate API call (will be replaced with real API in Step 3)
         setTimeout(() => {
             setComments(mockComments);
             setLoading(false);
@@ -33,7 +49,7 @@ export default function DashboardPage() {
     const handleGenerateReply = (commentId) => {
         setGenerating((prev) => ({ ...prev, [commentId]: true }));
 
-        // Simulate AI generation
+        // Simulate AI generation (will be replaced with real API in Step 4)
         setTimeout(() => {
             setReplies((prev) => ({
                 ...prev,
@@ -56,7 +72,7 @@ export default function DashboardPage() {
     };
 
     const handleSignOut = () => {
-        router.push("/login");
+        signOut({ callbackUrl: "/login" });
     };
 
     const getInitials = (name) => {
@@ -98,9 +114,26 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-medium text-white">U</span>
-                        </div>
+                        {/* Show user avatar/info from Google session */}
+                        {session?.user?.image ? (
+                            <img
+                                src={session.user.image}
+                                alt={session.user.name || "User"}
+                                className="w-8 h-8 rounded-full"
+                                referrerPolicy="no-referrer"
+                            />
+                        ) : (
+                            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-medium text-white">
+                                    {session?.user?.name
+                                        ? getInitials(session.user.name)
+                                        : "U"}
+                                </span>
+                            </div>
+                        )}
+                        <span className="text-sm text-yt-dark hidden sm:block">
+                            {session?.user?.name}
+                        </span>
                         <button
                             onClick={handleSignOut}
                             className="text-sm text-yt-gray-text hover:text-yt-dark transition-colors cursor-pointer"

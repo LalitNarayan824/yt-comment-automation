@@ -1,13 +1,32 @@
 "use client";
 
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function LoginPage() {
+    const { data: session, status } = useSession();
     const router = useRouter();
 
+    // If already logged in, redirect to dashboard
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.push("/dashboard");
+        }
+    }, [status, router]);
+
     const handleSignIn = () => {
-        router.push("/dashboard");
+        signIn("google", { callbackUrl: "/dashboard" });
     };
+
+    // Show loading while checking session
+    if (status === "loading") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white">
+                <div className="text-sm text-yt-gray-text">Loading...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-white">
