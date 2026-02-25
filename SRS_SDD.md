@@ -360,6 +360,173 @@ Login → You should get Google OAuth popup.
 
 If login works → Phase 1 backend has officially started 💪
 
+# STEP 2.5 Fetching Channel Info and Videos in Next.js (YouTube OAuth Integration)
+
+
+
+
+After a user logs in via Google OAuth, we can use the access token to:
+
+Fetch channel information
+
+Fetch the user’s uploaded videos
+
+This document explains how to implement this in a Next.js (App Router) + NextAuth setup.
+
+Architecture Flow
+User Login (OAuth)
+        ↓
+NextAuth stores access token
+        ↓
+Backend API route uses access token
+        ↓
+Call YouTube API
+        ↓
+Return data to frontend dashboard
+Step 1 — Store Access Token in NextAuth
+
+File:
+
+/app/api/auth/[...nextauth]/route.ts
+
+Add the following callbacks:
+
+callbacks: {
+  async jwt({ token, account }) {
+    if (account) {
+      token.accessToken = account.access_token;
+    }
+    return token;
+  },
+  async session({ session, token }) {
+    session.accessToken = token.accessToken;
+    return session;
+  }
+}
+
+Now the session contains:
+
+session.accessToken
+
+This token will be used for API calls.
+
+Step 2 — Fetch Channel Information
+
+Create file:
+
+/app/api/channel/route.ts
+Backend Code
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.accessToken) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true",
+    {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    }
+  );
+
+  const data = await res.json();
+  return Response.json(data);
+}
+What This Returns
+
+From:
+
+data.items[0]
+
+You get:
+
+Channel Title
+
+Channel ID
+
+Subscriber Count
+
+Total Views
+
+Profile Image URL
+
+Step 3 — Fetch User’s Videos
+
+Create file:
+
+/app/api/videos/route.ts
+Backend Code
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.accessToken) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/search?part=snippet&forMine=true&type=video&maxResults=10",
+    {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    }
+  );
+
+  const data = await res.json();
+  return Response.json(data);
+}
+What This Returns
+
+Each item contains:
+
+Video ID → item.id.videoId
+
+Title → item.snippet.title
+
+Thumbnail → item.snippet.thumbnails.default.url
+
+Published Date
+
+Required OAuth Scope
+
+Make sure your OAuth scope includes:
+
+https://www.googleapis.com/auth/youtube.force-ssl
+
+Without this scope, forMine=true will not work.
+
+Important Security Notes
+
+Never call YouTube API directly from frontend.
+
+Always call through your backend API routes.
+
+Never expose access tokens in the browser.
+
+Store secrets in .env.local.
+
+Next Step
+
+After videos are loaded:
+
+User selects video →
+Fetch comments using:
+
+/youtube/v3/commentThreads?videoId=VIDEO_ID
+
+That becomes the base for your AI reply generation system.
+
+
+
 # STEP 3 — Fetch Comments from YouTube
 
 Create:

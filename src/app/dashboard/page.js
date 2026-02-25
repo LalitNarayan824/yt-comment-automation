@@ -1,20 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { mockComments, mockReplies } from "@/lib/mockData";
 
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const [videoId, setVideoId] = useState("");
-    const [comments, setComments] = useState([]);
-    const [replies, setReplies] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [generating, setGenerating] = useState({});
-    const [posted, setPosted] = useState({});
-    const [fetched, setFetched] = useState(false);
+
+    const [channel, setChannel] = useState(null);
+    const [videos, setVideos] = useState([]);
+    const [loadingChannel, setLoadingChannel] = useState(true);
+    const [loadingVideos, setLoadingVideos] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Fetch channel info and videos on mount
+    useEffect(() => {
+        if (status !== "authenticated") return;
+
+        const fetchChannel = async () => {
+            try {
+                const res = await fetch("/api/channel");
+                const data = await res.json();
+                if (res.ok && data.items?.length > 0) {
+                    setChannel(data.items[0]);
+                } else {
+                    setError(data.error || "No channel found");
+                }
+            } catch (err) {
+                setError("Failed to load channel info");
+            } finally {
+                setLoadingChannel(false);
+            }
+        };
+
+        const fetchVideos = async () => {
+            try {
+                const res = await fetch("/api/videos");
+                const data = await res.json();
+                if (res.ok && data.items) {
+                    setVideos(data.items);
+                }
+            } catch (err) {
+                // silently fail for videos
+            } finally {
+                setLoadingVideos(false);
+            }
+        };
+
+        fetchChannel();
+        fetchVideos();
+    }, [status]);
 
     // Redirect to login if not authenticated
     if (status === "loading") {
@@ -30,74 +66,26 @@ export default function DashboardPage() {
         return null;
     }
 
-    const handleFetchComments = () => {
-        if (!videoId.trim()) return;
-        setLoading(true);
-        setFetched(false);
-        setComments([]);
-        setReplies({});
-        setPosted({});
-
-        // Simulate API call (will be replaced with real API in Step 3)
-        setTimeout(() => {
-            setComments(mockComments);
-            setLoading(false);
-            setFetched(true);
-        }, 1500);
-    };
-
-    const handleGenerateReply = (commentId) => {
-        setGenerating((prev) => ({ ...prev, [commentId]: true }));
-
-        // Simulate AI generation (will be replaced with real API in Step 4)
-        setTimeout(() => {
-            setReplies((prev) => ({
-                ...prev,
-                [commentId]: mockReplies[commentId] || "Thank you for your comment!",
-            }));
-            setGenerating((prev) => ({ ...prev, [commentId]: false }));
-        }, 1200);
-    };
-
-    const handleReplyChange = (commentId, value) => {
-        setReplies((prev) => ({ ...prev, [commentId]: value }));
-    };
-
-    const handlePost = (commentId) => {
-        setPosted((prev) => ({ ...prev, [commentId]: true }));
-        // Reset after 3 seconds
-        setTimeout(() => {
-            setPosted((prev) => ({ ...prev, [commentId]: false }));
-        }, 3000);
-    };
-
     const handleSignOut = () => {
         signOut({ callbackUrl: "/login" });
     };
 
-    const getInitials = (name) => {
-        return name
-            .split(/[\s]+/)
-            .map((w) => w[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2);
+    const handleSelectVideo = (videoId) => {
+        router.push(`/dashboard/video/${videoId}`);
     };
 
-    const avatarColors = [
-        "bg-red-600",
-        "bg-blue-600",
-        "bg-green-600",
-        "bg-purple-600",
-        "bg-orange-500",
-        "bg-teal-600",
-    ];
+    const formatCount = (count) => {
+        const num = parseInt(count, 10);
+        if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
+        if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
+        return num.toLocaleString();
+    };
 
     return (
         <div className="min-h-screen bg-yt-light-gray">
             {/* Navbar */}
             <nav className="bg-white border-b border-yt-gray-border sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+                <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-5.5 bg-yt-red rounded flex items-center justify-center">
                             <svg
@@ -114,7 +102,6 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* Show user avatar/info from Google session */}
                         {session?.user?.image ? (
                             <img
                                 src={session.user.image}
@@ -124,11 +111,7 @@ export default function DashboardPage() {
                             />
                         ) : (
                             <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                                <span className="text-xs font-medium text-white">
-                                    {session?.user?.name
-                                        ? getInitials(session.user.name)
-                                        : "U"}
-                                </span>
+                                <span className="text-xs font-medium text-white">U</span>
                             </div>
                         )}
                         <span className="text-sm text-yt-dark hidden sm:block">
@@ -144,208 +127,179 @@ export default function DashboardPage() {
                 </div>
             </nav>
 
-            {/* Main Content */}
-            <main className="max-w-5xl mx-auto px-4 py-6">
-                {/* Video ID Input */}
-                <div className="bg-white rounded-lg border border-yt-gray-border p-4 mb-6">
-                    <label className="block text-sm font-medium text-yt-dark mb-2">
-                        YouTube Video ID
-                    </label>
-                    <div className="flex gap-3">
-                        <input
-                            type="text"
-                            value={videoId}
-                            onChange={(e) => setVideoId(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleFetchComments()}
-                            placeholder="e.g. dQw4w9WgXcQ"
-                            className="flex-1 px-3 py-2 border border-yt-gray-border rounded-lg text-sm text-yt-dark placeholder:text-gray-400 focus:outline-none focus:border-yt-blue focus:ring-1 focus:ring-yt-blue"
-                        />
-                        <button
-                            onClick={handleFetchComments}
-                            disabled={!videoId.trim() || loading}
-                            className="px-5 py-2 bg-yt-blue text-white text-sm font-medium rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        >
-                            {loading ? "Fetching..." : "Fetch Comments"}
-                        </button>
+            {/* Main Content — Two Column Layout */}
+            <main className="max-w-6xl mx-auto px-4 py-6">
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4 mb-6">
+                        {error}
+                    </div>
+                )}
+
+                <div className="flex flex-col lg:flex-row gap-6">
+                    {/* LEFT — Channel Info */}
+                    <div className="lg:w-80 shrink-0">
+                        <div className="bg-white rounded-lg border border-yt-gray-border p-6 sticky top-20">
+                            {loadingChannel ? (
+                                <div className="animate-pulse space-y-4">
+                                    <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto" />
+                                    <div className="h-5 bg-gray-200 rounded w-3/4 mx-auto" />
+                                    <div className="h-3 bg-gray-200 rounded w-1/2 mx-auto" />
+                                    <div className="space-y-2 pt-4 border-t border-yt-gray-border">
+                                        <div className="h-4 bg-gray-200 rounded w-full" />
+                                        <div className="h-4 bg-gray-200 rounded w-full" />
+                                        <div className="h-4 bg-gray-200 rounded w-full" />
+                                    </div>
+                                </div>
+                            ) : channel ? (
+                                <div className="text-center">
+                                    {/* Channel Avatar */}
+                                    <img
+                                        src={channel.snippet?.thumbnails?.medium?.url || channel.snippet?.thumbnails?.default?.url}
+                                        alt={channel.snippet?.title}
+                                        className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-yt-gray-border"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                    {/* Channel Name */}
+                                    <h2 className="text-lg font-semibold text-yt-dark mb-1">
+                                        {channel.snippet?.title}
+                                    </h2>
+                                    {/* Custom URL */}
+                                    {channel.snippet?.customUrl && (
+                                        <p className="text-sm text-yt-gray-text mb-4">
+                                            {channel.snippet.customUrl}
+                                        </p>
+                                    )}
+
+                                    {/* Stats */}
+                                    <div className="border-t border-yt-gray-border pt-4 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-yt-gray-text">Subscribers</span>
+                                            <span className="text-sm font-medium text-yt-dark">
+                                                {channel.statistics?.subscriberCount
+                                                    ? formatCount(channel.statistics.subscriberCount)
+                                                    : "Hidden"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-yt-gray-text">Total Views</span>
+                                            <span className="text-sm font-medium text-yt-dark">
+                                                {formatCount(channel.statistics?.viewCount || "0")}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-yt-gray-text">Videos</span>
+                                            <span className="text-sm font-medium text-yt-dark">
+                                                {formatCount(channel.statistics?.videoCount || "0")}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Channel Description */}
+                                    {channel.snippet?.description && (
+                                        <div className="border-t border-yt-gray-border pt-4 mt-4">
+                                            <p className="text-xs text-yt-gray-text text-left leading-relaxed line-clamp-4">
+                                                {channel.snippet.description}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <p className="text-sm text-yt-gray-text">
+                                        No channel info available
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* RIGHT — Videos Grid */}
+                    <div className="flex-1">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-semibold text-yt-dark">
+                                Your Videos
+                            </h2>
+                            <p className="text-sm text-yt-gray-text">
+                                Select a video to manage its comments
+                            </p>
+                        </div>
+
+                        {loadingVideos ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div
+                                        key={i}
+                                        className="bg-white rounded-lg border border-yt-gray-border overflow-hidden animate-pulse"
+                                    >
+                                        <div className="aspect-video bg-gray-200" />
+                                        <div className="p-3 space-y-2">
+                                            <div className="h-4 bg-gray-200 rounded w-full" />
+                                            <div className="h-3 bg-gray-200 rounded w-2/3" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : videos.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {videos.map((video) => (
+                                    <button
+                                        key={video.id.videoId}
+                                        onClick={() => handleSelectVideo(video.id.videoId)}
+                                        className="bg-white rounded-lg border border-yt-gray-border overflow-hidden hover:border-yt-blue hover:shadow-sm transition-all text-left cursor-pointer group"
+                                    >
+                                        {/* Thumbnail */}
+                                        <div className="aspect-video bg-gray-100 relative overflow-hidden">
+                                            <img
+                                                src={video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url}
+                                                alt={video.snippet.title}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                            {/* Hover overlay */}
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                                <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 px-3 py-1.5 rounded-full">
+                                                    Manage Comments
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* Video Info */}
+                                        <div className="p-3">
+                                            <h3 className="text-sm font-medium text-yt-dark line-clamp-2 leading-snug mb-1">
+                                                {video.snippet.title}
+                                            </h3>
+                                            <p className="text-xs text-yt-gray-text">
+                                                {new Date(video.snippet.publishedAt).toLocaleDateString("en-US", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                })}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-lg border border-yt-gray-border p-12 text-center">
+                                <svg
+                                    className="w-16 h-16 mx-auto text-gray-300 mb-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1.5}
+                                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    />
+                                </svg>
+                                <p className="text-sm text-yt-gray-text">
+                                    No videos found on your channel
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
-
-                {/* Empty State */}
-                {!fetched && !loading && (
-                    <div className="text-center py-20">
-                        <svg
-                            className="w-16 h-16 mx-auto text-gray-300 mb-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                            />
-                        </svg>
-                        <p className="text-yt-gray-text text-sm">
-                            Enter a video ID above to fetch and manage comments
-                        </p>
-                    </div>
-                )}
-
-                {/* Loading Skeleton */}
-                {loading && (
-                    <div className="space-y-4">
-                        {[1, 2, 3].map((i) => (
-                            <div
-                                key={i}
-                                className="bg-white rounded-lg border border-yt-gray-border p-4 animate-pulse"
-                            >
-                                <div className="flex gap-3">
-                                    <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0" />
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-3 bg-gray-200 rounded w-28" />
-                                        <div className="h-4 bg-gray-200 rounded w-full" />
-                                        <div className="h-4 bg-gray-200 rounded w-3/4" />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Comment Cards */}
-                {fetched && !loading && (
-                    <div className="space-y-4">
-                        <p className="text-sm text-yt-gray-text mb-2">
-                            {comments.length} comments
-                        </p>
-                        {comments.map((comment, index) => (
-                            <div
-                                key={comment.id}
-                                className="bg-white rounded-lg border border-yt-gray-border p-4"
-                            >
-                                <div className="flex gap-3">
-                                    {/* Avatar */}
-                                    <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${avatarColors[index % avatarColors.length]}`}
-                                    >
-                                        <span className="text-xs font-medium text-white">
-                                            {getInitials(comment.author)}
-                                        </span>
-                                    </div>
-
-                                    {/* Comment Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-medium text-yt-dark">
-                                                @{comment.author}
-                                            </span>
-                                            <span className="text-xs text-yt-gray-text">
-                                                {comment.publishedAt}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-yt-dark leading-relaxed mb-3">
-                                            {comment.text}
-                                        </p>
-
-                                        {/* Like count */}
-                                        <div className="flex items-center gap-1 mb-3">
-                                            <svg
-                                                className="w-4 h-4 text-yt-gray-text"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={1.5}
-                                                    d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017a2 2 0 01-.632-.103l-3.114-1.038a1 1 0 00-.317-.052H5V10l4.293-4.293a1 1 0 01.707-.293h.382a1.5 1.5 0 011.458 1.858L11.149 10z"
-                                                />
-                                            </svg>
-                                            <span className="text-xs text-yt-gray-text">
-                                                {comment.likes}
-                                            </span>
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="space-y-3">
-                                            {!replies[comment.id] && !generating[comment.id] && (
-                                                <button
-                                                    onClick={() => handleGenerateReply(comment.id)}
-                                                    className="text-sm text-yt-blue font-medium hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                                                >
-                                                    ✨ Generate Reply
-                                                </button>
-                                            )}
-
-                                            {generating[comment.id] && (
-                                                <div className="flex items-center gap-2 text-sm text-yt-gray-text px-3 py-1.5">
-                                                    <svg
-                                                        className="w-4 h-4 animate-spin"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <circle
-                                                            className="opacity-25"
-                                                            cx="12"
-                                                            cy="12"
-                                                            r="10"
-                                                            stroke="currentColor"
-                                                            strokeWidth="4"
-                                                        />
-                                                        <path
-                                                            className="opacity-75"
-                                                            fill="currentColor"
-                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                                        />
-                                                    </svg>
-                                                    Generating AI reply...
-                                                </div>
-                                            )}
-
-                                            {replies[comment.id] && (
-                                                <div className="space-y-2">
-                                                    <textarea
-                                                        value={replies[comment.id]}
-                                                        onChange={(e) =>
-                                                            handleReplyChange(comment.id, e.target.value)
-                                                        }
-                                                        rows={3}
-                                                        className="w-full px-3 py-2 text-sm border border-yt-gray-border rounded-lg focus:outline-none focus:border-yt-blue focus:ring-1 focus:ring-yt-blue resize-none text-yt-dark"
-                                                    />
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => handlePost(comment.id)}
-                                                            disabled={posted[comment.id]}
-                                                            className="px-4 py-1.5 bg-yt-blue text-white text-sm font-medium rounded-full hover:bg-blue-700 disabled:opacity-70 transition-colors cursor-pointer"
-                                                        >
-                                                            {posted[comment.id]
-                                                                ? "✓ Posted"
-                                                                : "Approve & Post"}
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                setReplies((prev) => {
-                                                                    const next = { ...prev };
-                                                                    delete next[comment.id];
-                                                                    return next;
-                                                                })
-                                                            }
-                                                            className="px-4 py-1.5 text-sm text-yt-gray-text hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </main>
         </div>
     );
