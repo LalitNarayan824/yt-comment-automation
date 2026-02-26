@@ -17,6 +17,8 @@ export default function VideoCommentsPage() {
     const [posted, setPosted] = useState({});
     const [fetched, setFetched] = useState(false);
     const [error, setError] = useState(null);
+    const [tone, setTone] = useState("friendly");
+    const [genError, setGenError] = useState({});
 
     // Auto-fetch comments when page loads
     useEffect(() => {
@@ -63,17 +65,28 @@ export default function VideoCommentsPage() {
         }
     };
 
-    const handleGenerateReply = (commentId) => {
+    const handleGenerateReply = async (commentId, commentText) => {
         setGenerating((prev) => ({ ...prev, [commentId]: true }));
+        setGenError((prev) => ({ ...prev, [commentId]: null }));
 
-        // Still using mock generation (will be replaced in Step 4)
-        setTimeout(() => {
-            setReplies((prev) => ({
-                ...prev,
-                [commentId]: "Thank you for your comment! We really appreciate your feedback.",
-            }));
+        try {
+            const res = await fetch("/api/generate-reply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ commentText, tone }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setGenError((prev) => ({ ...prev, [commentId]: data.error || "Failed to generate" }));
+            } else {
+                setReplies((prev) => ({ ...prev, [commentId]: data.reply }));
+            }
+        } catch (err) {
+            setGenError((prev) => ({ ...prev, [commentId]: "Network error" }));
+        } finally {
             setGenerating((prev) => ({ ...prev, [commentId]: false }));
-        }, 1200);
+        }
     };
 
     const handleReplyChange = (commentId, value) => {
@@ -203,9 +216,25 @@ export default function VideoCommentsPage() {
                 {/* Comment Cards */}
                 {fetched && !loading && comments.length > 0 && (
                     <div className="space-y-4">
-                        <p className="text-sm text-yt-gray-text mb-2">
-                            {comments.length} comments loaded
-                        </p>
+                        <div className="flex items-center justify-between mb-4">
+                            <p className="text-sm text-yt-gray-text">
+                                {comments.length} comments loaded
+                            </p>
+                            <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
+                                {["friendly", "professional", "humorous"].map((t) => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setTone(t)}
+                                        className={`px-3 py-1 text-xs font-medium rounded-full transition-colors cursor-pointer ${tone === t
+                                                ? "bg-white text-yt-dark shadow-sm"
+                                                : "text-yt-gray-text hover:text-yt-dark"
+                                            }`}
+                                    >
+                                        {t === "friendly" ? "😊 Friendly" : t === "professional" ? "💼 Professional" : "😄 Humorous"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         {comments.map((comment) => (
                             <div
                                 key={comment.id}
@@ -261,12 +290,17 @@ export default function VideoCommentsPage() {
                                         {/* Actions */}
                                         <div className="space-y-3">
                                             {!replies[comment.id] && !generating[comment.id] && (
-                                                <button
-                                                    onClick={() => handleGenerateReply(comment.id)}
-                                                    className="text-sm text-yt-blue font-medium hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                                                >
-                                                    ✨ Generate Reply
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleGenerateReply(comment.id, comment.text)}
+                                                        className="text-sm text-yt-blue font-medium hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+                                                    >
+                                                        ✨ Generate Reply
+                                                    </button>
+                                                    {genError[comment.id] && (
+                                                        <span className="text-xs text-red-500">{genError[comment.id]}</span>
+                                                    )}
+                                                </div>
                                             )}
 
                                             {generating[comment.id] && (
@@ -294,6 +328,19 @@ export default function VideoCommentsPage() {
                                                             className="px-4 py-1.5 bg-yt-blue text-white text-sm font-medium rounded-full hover:bg-blue-700 disabled:opacity-70 transition-colors cursor-pointer"
                                                         >
                                                             {posted[comment.id] ? "✓ Posted" : "Approve & Post"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setReplies((prev) => {
+                                                                    const next = { ...prev };
+                                                                    delete next[comment.id];
+                                                                    return next;
+                                                                });
+                                                                handleGenerateReply(comment.id, comment.text);
+                                                            }}
+                                                            className="px-4 py-1.5 text-sm text-yt-blue hover:bg-blue-50 rounded-full transition-colors cursor-pointer"
+                                                        >
+                                                            ↻ Regenerate
                                                         </button>
                                                         <button
                                                             onClick={() =>
