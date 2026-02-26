@@ -15,6 +15,8 @@ export default function VideoCommentsPage() {
     const [loading, setLoading] = useState(false);
     const [generating, setGenerating] = useState({});
     const [posted, setPosted] = useState({});
+    const [posting, setPosting] = useState({});
+    const [postError, setPostError] = useState({});
     const [fetched, setFetched] = useState(false);
     const [error, setError] = useState(null);
     const [tone, setTone] = useState("friendly");
@@ -93,11 +95,31 @@ export default function VideoCommentsPage() {
         setReplies((prev) => ({ ...prev, [commentId]: value }));
     };
 
-    const handlePost = (commentId) => {
-        setPosted((prev) => ({ ...prev, [commentId]: true }));
-        setTimeout(() => {
-            setPosted((prev) => ({ ...prev, [commentId]: false }));
-        }, 3000);
+    const handlePost = async (commentId) => {
+        const replyText = replies[commentId];
+        if (!replyText) return;
+
+        setPosting((prev) => ({ ...prev, [commentId]: true }));
+        setPostError((prev) => ({ ...prev, [commentId]: null }));
+
+        try {
+            const res = await fetch("/api/post-reply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ parentId: commentId, replyText }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setPostError((prev) => ({ ...prev, [commentId]: data.error || "Failed to post" }));
+            } else {
+                setPosted((prev) => ({ ...prev, [commentId]: true }));
+            }
+        } catch (err) {
+            setPostError((prev) => ({ ...prev, [commentId]: "Network error" }));
+        } finally {
+            setPosting((prev) => ({ ...prev, [commentId]: false }));
+        }
     };
 
     const formatTimeAgo = (dateString) => {
@@ -226,8 +248,8 @@ export default function VideoCommentsPage() {
                                         key={t}
                                         onClick={() => setTone(t)}
                                         className={`px-3 py-1 text-xs font-medium rounded-full transition-colors cursor-pointer ${tone === t
-                                                ? "bg-white text-yt-dark shadow-sm"
-                                                : "text-yt-gray-text hover:text-yt-dark"
+                                            ? "bg-white text-yt-dark shadow-sm"
+                                            : "text-yt-gray-text hover:text-yt-dark"
                                             }`}
                                     >
                                         {t === "friendly" ? "😊 Friendly" : t === "professional" ? "💼 Professional" : "😄 Humorous"}
@@ -324,11 +346,14 @@ export default function VideoCommentsPage() {
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => handlePost(comment.id)}
-                                                            disabled={posted[comment.id]}
+                                                            disabled={posted[comment.id] || posting[comment.id]}
                                                             className="px-4 py-1.5 bg-yt-blue text-white text-sm font-medium rounded-full hover:bg-blue-700 disabled:opacity-70 transition-colors cursor-pointer"
                                                         >
-                                                            {posted[comment.id] ? "✓ Posted" : "Approve & Post"}
+                                                            {posting[comment.id] ? "Posting..." : posted[comment.id] ? "✓ Posted" : "Approve & Post"}
                                                         </button>
+                                                        {postError[comment.id] && (
+                                                            <span className="text-xs text-red-500">{postError[comment.id]}</span>
+                                                        )}
                                                         <button
                                                             onClick={() => {
                                                                 setReplies((prev) => {
