@@ -99,6 +99,4 @@ yt-comment-automation/
 - OAuth tokens (Access tokens) are stored securely in the server-side NextAuth session.
 - AI logic and YouTube Data API logic happen securely within backend API Routes (`/api/...`), so sensitive API keys and tokens are never exposed to the client-side browser bundle.
 
-## License
 
-MIT
