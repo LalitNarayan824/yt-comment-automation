@@ -1,14 +1,43 @@
 @import "tailwindcss";
 
 @theme inline {
+  /* Brand */
   --color-yt-red: #ff0000;
   --color-yt-red-hover: #cc0000;
-  --color-yt-dark: #0f0f0f;
-  --color-yt-gray-bg: #f2f2f2;
-  --color-yt-gray-border: #e5e5e5;
-  --color-yt-gray-text: #606060;
-  --color-yt-light-gray: #f9f9f9;
-  --color-yt-blue: #065fd4;
+  --color-yt-blue: #3ea6ff;
+  --color-yt-blue-hover: #2196f3;
+  --color-yt-blue-subtle: rgba(62, 166, 255, 0.1);
+
+  /* Text */
+  --color-yt-text-primary: #e8e8e8;
+  --color-yt-text-secondary: #aaaaaa;
+  --color-yt-text-inverse: #0f0f0f;
+
+  /* Backgrounds */
+  --color-yt-bg-page: #0f0f0f;
+  --color-yt-bg-surface: #181818;
+  --color-yt-bg-surface-hover: #272727;
+  --color-yt-bg-elevated: #212121;
+  --color-yt-bg-skeleton: #272727;
+
+  /* Borders */
+  --color-yt-border: #3a3a3a;
+
+  /* States */
+  --color-yt-error-bg: rgba(255, 0, 0, 0.08);
+  --color-yt-error-border: #5c2020;
+  --color-yt-error-text: #ff6b6b;
+
+  /* Avatars */
+  --color-yt-avatar-purple: #7c3aed;
+  --color-yt-avatar-blue: #2563eb;
+
+  /* Misc */
+  --color-yt-icon-muted: #555555;
+  --color-yt-overlay: rgba(0, 0, 0, 0.7);
+  --color-yt-overlay-hover: rgba(0, 0, 0, 0.3);
+  --color-yt-shadow: rgba(0, 0, 0, 0.5);
+
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
@@ -21,8 +50,8 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: var(--color-yt-light-gray);
-    color: var(--color-yt-dark);
+    background-color: var(--color-yt-bg-page);
+    color: var(--color-yt-text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function LoginPage() {
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const router = useRouter();
 
     // If already logged in, redirect to dashboard
@@ -22,14 +22,14 @@ export default function LoginPage() {
     // Show loading while checking session
     if (status === "loading") {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="text-sm text-yt-gray-text">Loading...</div>
+            <div className="min-h-screen flex items-center justify-center bg-yt-bg-page">
+                <div className="text-sm text-yt-text-secondary">Loading...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="min-h-screen flex items-center justify-center bg-yt-bg-page">
             <div className="w-full max-w-md p-8">
                 {/* Logo / Branding */}
                 <div className="text-center mb-8">
@@ -37,32 +37,32 @@ export default function LoginPage() {
                         {/* YouTube-style play icon */}
                         <div className="w-10 h-7 bg-yt-red rounded-lg flex items-center justify-center">
                             <svg
-                                className="w-4 h-4 text-white ml-0.5"
+                                className="w-4 h-4 text-yt-text-inverse ml-0.5"
                                 fill="currentColor"
                                 viewBox="0 0 24 24"
                             >
                                 <path d="M8 5v14l11-7z" />
                             </svg>
                         </div>
-                        <span className="text-xl font-semibold text-yt-dark">
+                        <span className="text-xl font-semibold text-yt-text-primary">
                             CommentAI
                         </span>
                     </div>
-                    <h1 className="text-2xl font-normal text-yt-dark mb-2">Sign in</h1>
-                    <p className="text-sm text-yt-gray-text">
+                    <h1 className="text-2xl font-normal text-yt-text-primary mb-2">Sign in</h1>
+                    <p className="text-sm text-yt-text-secondary">
                         to continue to YouTube Comment Automation
                     </p>
                 </div>
 
                 {/* Sign-in Card */}
-                <div className="border border-yt-gray-border rounded-lg p-8 bg-white">
-                    <p className="text-sm text-yt-gray-text mb-6 text-center">
+                <div className="border border-yt-border rounded-lg p-8 bg-yt-bg-surface">
+                    <p className="text-sm text-yt-text-secondary mb-6 text-center">
                         Sign in with your Google account to manage YouTube comments with AI-powered replies.
                     </p>
 
                     <button
                         onClick={handleSignIn}
-                        className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-yt-gray-border rounded-full hover:bg-yt-gray-bg transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-yt-border rounded-full hover:bg-yt-bg-surface-hover transition-colors cursor-pointer"
                     >
                         {/* Google "G" logo */}
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -83,7 +83,7 @@ export default function LoginPage() {
                                 fill="#EA4335"
                             />
                         </svg>
-                        <span className="text-sm font-medium text-yt-dark">
+                        <span className="text-sm font-medium text-yt-text-primary">
                             Sign in with Google
                         </span>
                     </button>
@@ -91,7 +91,7 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <div className="mt-8 text-center">
-                    <p className="text-xs text-yt-gray-text">
+                    <p className="text-xs text-yt-text-secondary">
                         By signing in, you agree to let this app manage your YouTube comments.
                     </p>
                 </div>
