@@ -1,4 +1,6 @@
-export const mockComments = [
+import type { MockComment } from "@/types";
+
+export const mockComments: MockComment[] = [
     {
         id: "c1",
         author: "TechFan99",
@@ -43,7 +45,7 @@ export const mockComments = [
     },
 ];
 
-export const mockReplies = {
+export const mockReplies: Record<string, string> = {
     c1: "Thank you so much for the kind words! 😊 I'm really glad the async/await explanation clicked for you. Stay tuned for more deep dives!",
     c2: "Great suggestion! React hooks are definitely on my list — I'll cover useEffect cleanup in detail in an upcoming video. Stay tuned!",
     c3: "Really appreciate the catch! You're absolutely right about that import. I've pinned a correction in the comments. Thanks for keeping me honest! 👍",

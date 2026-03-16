@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { NextRequest } from "next/server";
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.accessToken) {
@@ -37,7 +37,8 @@ export async function GET(request) {
         const data = await res.json();
 
         // Extract and structure the comments
-        const comments = (data.items || []).map((item) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const comments = (data.items || []).map((item: any) => {
             const snippet = item.snippet.topLevelComment.snippet;
             return {
                 id: item.snippet.topLevelComment.id,
@@ -55,7 +56,7 @@ export async function GET(request) {
             nextPageToken: data.nextPageToken || null,
             totalResults: data.pageInfo?.totalResults || comments.length,
         });
-    } catch (error) {
+    } catch {
         return Response.json(
             { error: "Failed to fetch comments" },
             { status: 500 }

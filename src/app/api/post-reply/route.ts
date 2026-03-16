@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { NextRequest } from "next/server";
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.accessToken) {
@@ -9,7 +10,7 @@ export async function POST(request) {
     }
 
     try {
-        const { parentId, replyText } = await request.json();
+        const { parentId, replyText }: { parentId?: string; replyText?: string } = await request.json();
 
         if (!parentId || !replyText) {
             return Response.json(
