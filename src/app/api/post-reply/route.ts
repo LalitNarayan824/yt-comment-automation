@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { NextRequest } from "next/server";
+import { markReplyPosted } from "@/lib/services/reply.service";
 
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -10,11 +11,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { parentId, replyText }: { parentId?: string; replyText?: string } = await request.json();
+        const { replyId, parentId, replyText }: { replyId?: string; parentId?: string; replyText?: string } = await request.json();
 
-        if (!parentId || !replyText) {
+        // parentId is the YouTube Comment ID (needed for YouTube API)
+        // replyId is our internal Database Reply UUID (needed for markReplyPosted)
+        if (!replyId || !parentId || !replyText) {
             return Response.json(
-                { error: "parentId and replyText are required" },
+                { error: "replyId, parentId (youtube comment id), and replyText are required" },
                 { status: 400 }
             );
         }
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
                 },
                 body: JSON.stringify({
                     snippet: {
-                        parentId: parentId,
+                        parentId: parentId, // Must be the YouTube Comment ID
                         textOriginal: replyText,
                     },
                 }),
@@ -60,9 +63,12 @@ export async function POST(request: NextRequest) {
 
         const data = await res.json();
 
+        // Success — now update our database state atomically
+        await markReplyPosted(replyId);
+
         return Response.json({
             success: true,
-            commentId: data.id,
+            youtubeCommentId: data.id,
             text: data.snippet?.textDisplay,
         });
     } catch (error) {

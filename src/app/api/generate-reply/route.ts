@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import type { Tone, ToneInstructions } from "@/types";
+import { saveReply } from "@/lib/services/reply.service";
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
@@ -51,11 +52,11 @@ async function generateWithRetry(prompt: string): Promise<string | undefined> {
 
 export async function POST(request: NextRequest) {
     try {
-        const { commentText, tone = "friendly" }: { commentText?: string; tone?: Tone } = await request.json();
+        const { commentId, commentText, tone = "friendly" }: { commentId?: string; commentText?: string; tone?: Tone } = await request.json();
 
-        if (!commentText) {
+        if (!commentId || !commentText) {
             return Response.json(
-                { error: "commentText is required" },
+                { error: "commentId and commentText are required" },
                 { status: 400 }
             );
         }
@@ -85,9 +86,22 @@ Reply directly — do not include any prefix like "Reply:" or quotes.
 
 Comment: "${commentText}"`;
 
-        const reply = await generateWithRetry(prompt);
+        const generatedReplyText = await generateWithRetry(prompt);
 
-        return Response.json({ reply });
+        if (!generatedReplyText) {
+            return Response.json(
+                { error: "LLM returned an empty response" },
+                { status: 500 }
+            );
+        }
+
+        // Save generated reply to the database
+        const dbReply = await saveReply(commentId, generatedReplyText);
+
+        return Response.json({
+            reply: dbReply.generatedReply,
+            replyId: dbReply.id,
+        });
     } catch (error: unknown) {
         const groqError = error as GroqError;
         console.error("Groq API error:", error);

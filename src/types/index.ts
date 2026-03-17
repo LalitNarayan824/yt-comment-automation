@@ -10,12 +10,26 @@ export interface MockComment {
 
 export interface Comment {
     id: string;
-    author: string;
+    youtubeCommentId: string;
+    videoId: string;
+    authorName: string;
+    authorChannelId?: string;
     authorProfileImage?: string;
     text: string;
     likeCount: number;
-    publishedAt: string;
     totalReplyCount: number;
+    publishedAt: string | Date;
+    replied: boolean;
+    replies?: Reply[];
+}
+
+export interface Reply {
+    id: string;
+    commentId: string;
+    generatedReply: string;
+    editedReply?: string;
+    posted: boolean;
+    postedAt?: string | Date;
 }
 
 export interface YouTubeThumbnail {
@@ -50,18 +64,13 @@ export interface Channel {
     statistics?: ChannelStatistics;
 }
 
-export interface VideoSnippet {
-    title: string;
-    description?: string;
-    publishedAt: string;
-    thumbnails?: YouTubeThumbnails;
-}
-
 export interface Video {
-    id: {
-        videoId: string;
-    };
-    snippet: VideoSnippet;
+    id: string;
+    youtubeVideoId: string;
+    title: string;
+    thumbnailUrl?: string;
+    publishedAt: string | Date;
+    userId: string;
 }
 
 export type Tone = "friendly" | "professional" | "humorous";
