@@ -39,8 +39,8 @@ export default function DashboardPage() {
             try {
                 const res = await fetch("/api/videos");
                 const data = await res.json();
-                if (res.ok && data.items) {
-                    setVideos(data.items);
+                if (res.ok && data.videos) {
+                    setVideos(data.videos);
                 }
             } catch {
                 // silently fail for videos
@@ -244,15 +244,15 @@ export default function DashboardPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {videos.map((video) => (
                                     <button
-                                        key={video.id.videoId}
-                                        onClick={() => handleSelectVideo(video.id.videoId)}
+                                        key={video.youtubeVideoId}
+                                        onClick={() => handleSelectVideo(video.youtubeVideoId)}
                                         className="bg-yt-bg-surface rounded-lg border border-yt-border overflow-hidden hover:border-yt-blue hover:shadow-sm transition-all text-left cursor-pointer group"
                                     >
                                         {/* Thumbnail */}
                                         <div className="aspect-video bg-yt-bg-elevated relative overflow-hidden">
                                             <img
-                                                src={video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url}
-                                                alt={video.snippet.title}
+                                                src={video.thumbnailUrl || ""}
+                                                alt={video.title}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                                 referrerPolicy="no-referrer"
                                             />
@@ -266,10 +266,10 @@ export default function DashboardPage() {
                                         {/* Video Info */}
                                         <div className="p-3">
                                             <h3 className="text-sm font-medium text-yt-text-primary line-clamp-2 leading-snug mb-1">
-                                                {video.snippet.title}
+                                                {video.title}
                                             </h3>
                                             <p className="text-xs text-yt-text-secondary">
-                                                {new Date(video.snippet.publishedAt).toLocaleDateString("en-US", {
+                                                {new Date(video.publishedAt).toLocaleDateString("en-US", {
                                                     year: "numeric",
                                                     month: "short",
                                                     day: "numeric",

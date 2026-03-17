@@ -12,7 +12,8 @@ export default function VideoCommentsPage() {
     const videoId = params.videoId as string;
 
     const [comments, setComments] = useState<Comment[]>([]);
-    const [replies, setReplies] = useState<Record<string, string>>({});
+    const [replies, setReplies] = useState<Record<string, string>>({}); // commentId -> generated text
+    const [replyIds, setReplyIds] = useState<Record<string, string>>({}); // commentId -> reply DB UUID
     const [loading, setLoading] = useState<boolean>(false);
     const [generating, setGenerating] = useState<Record<string, boolean>>({});
     const [posted, setPosted] = useState<Record<string, boolean>>({});
@@ -77,7 +78,7 @@ export default function VideoCommentsPage() {
             const res = await fetch("/api/generate-reply", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ commentText, tone }),
+                body: JSON.stringify({ commentId, commentText, tone }),
             });
             const data = await res.json();
 
@@ -85,6 +86,7 @@ export default function VideoCommentsPage() {
                 setGenError((prev) => ({ ...prev, [commentId]: data.error || "Failed to generate" }));
             } else {
                 setReplies((prev) => ({ ...prev, [commentId]: data.reply }));
+                setReplyIds((prev) => ({ ...prev, [commentId]: data.replyId }));
             }
         } catch {
             setGenError((prev) => ({ ...prev, [commentId]: "Network error" }));
@@ -97,9 +99,10 @@ export default function VideoCommentsPage() {
         setReplies((prev) => ({ ...prev, [commentId]: value }));
     };
 
-    const handlePost = async (commentId: string) => {
+    const handlePost = async (commentId: string, youtubeCommentId: string) => {
         const replyText = replies[commentId];
-        if (!replyText) return;
+        const replyId = replyIds[commentId];
+        if (!replyText || !replyId) return;
 
         setPosting((prev) => ({ ...prev, [commentId]: true }));
         setPostError((prev) => ({ ...prev, [commentId]: null }));
@@ -108,7 +111,7 @@ export default function VideoCommentsPage() {
             const res = await fetch("/api/post-reply", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ parentId: commentId, replyText }),
+                body: JSON.stringify({ parentId: youtubeCommentId, replyId, replyText }),
             });
             const data = await res.json();
 
@@ -269,14 +272,14 @@ export default function VideoCommentsPage() {
                                     {comment.authorProfileImage ? (
                                         <img
                                             src={comment.authorProfileImage}
-                                            alt={comment.author}
+                                            alt={comment.authorName}
                                             className="w-10 h-10 rounded-full shrink-0"
                                             referrerPolicy="no-referrer"
                                         />
                                     ) : (
                                         <div className="w-10 h-10 rounded-full bg-yt-avatar-blue flex items-center justify-center shrink-0">
                                             <span className="text-xs font-medium text-yt-text-inverse">
-                                                {comment.author?.charAt(0)?.toUpperCase() || "?"}
+                                                {comment.authorName?.charAt(0)?.toUpperCase() || "?"}
                                             </span>
                                         </div>
                                     )}
@@ -285,10 +288,10 @@ export default function VideoCommentsPage() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-sm font-medium text-yt-text-primary">
-                                                @{comment.author}
+                                                @{comment.authorName}
                                             </span>
                                             <span className="text-xs text-yt-text-secondary">
-                                                {formatTimeAgo(comment.publishedAt)}
+                                                {formatTimeAgo(comment.publishedAt as string)}
                                             </span>
                                         </div>
                                         <p
@@ -313,76 +316,95 @@ export default function VideoCommentsPage() {
 
                                         {/* Actions */}
                                         <div className="space-y-3">
-                                            {!replies[comment.id] && !generating[comment.id] && (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleGenerateReply(comment.id, comment.text)}
-                                                        className="text-sm text-yt-blue font-medium hover:bg-yt-blue-subtle px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                                                    >
-                                                        ✨ Generate Reply
-                                                    </button>
-                                                    {genError[comment.id] && (
-                                                        <span className="text-xs text-yt-error-text">{genError[comment.id]}</span>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {generating[comment.id] && (
-                                                <div className="flex items-center gap-2 text-sm text-yt-text-secondary px-3 py-1.5">
-                                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                    </svg>
-                                                    Generating AI reply...
-                                                </div>
-                                            )}
-
-                                            {replies[comment.id] && (
-                                                <div className="space-y-2">
-                                                    <textarea
-                                                        value={replies[comment.id]}
-                                                        onChange={(e) => handleReplyChange(comment.id, e.target.value)}
-                                                        rows={3}
-                                                        className="w-full px-3 py-2 text-sm border border-yt-border rounded-lg focus:outline-none focus:border-yt-blue focus:ring-1 focus:ring-yt-blue resize-none text-yt-text-primary bg-yt-bg-elevated"
-                                                    />
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => handlePost(comment.id)}
-                                                            disabled={posted[comment.id] || posting[comment.id]}
-                                                            className="px-4 py-1.5 bg-yt-blue text-yt-text-inverse text-sm font-medium rounded-full hover:bg-yt-blue-hover disabled:opacity-70 transition-colors cursor-pointer"
-                                                        >
-                                                            {posting[comment.id] ? "Posting..." : posted[comment.id] ? "✓ Posted" : "Approve & Post"}
-                                                        </button>
-                                                        {postError[comment.id] && (
-                                                            <span className="text-xs text-yt-error-text">{postError[comment.id]}</span>
-                                                        )}
-                                                        <button
-                                                            onClick={() => {
-                                                                setReplies((prev) => {
-                                                                    const next = { ...prev };
-                                                                    delete next[comment.id];
-                                                                    return next;
-                                                                });
-                                                                handleGenerateReply(comment.id, comment.text);
-                                                            }}
-                                                            className="px-4 py-1.5 text-sm text-yt-blue hover:bg-yt-blue-subtle rounded-full transition-colors cursor-pointer"
-                                                        >
-                                                            ↻ Regenerate
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                setReplies((prev) => {
-                                                                    const next = { ...prev };
-                                                                    delete next[comment.id];
-                                                                    return next;
-                                                                })
-                                                            }
-                                                            className="px-4 py-1.5 text-sm text-yt-text-secondary hover:bg-yt-bg-surface-hover rounded-full transition-colors cursor-pointer"
-                                                        >
-                                                            Cancel
-                                                        </button>
+                                            {/* Show existing reply if already replied in DB */}
+                                            {(comment.replied || (comment.replies && comment.replies.length > 0)) && !replies[comment.id] ? (
+                                                <div className="bg-yt-bg-elevated rounded-lg p-3 border border-yt-border">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <div className="w-5 h-5 bg-yt-blue rounded-full flex items-center justify-center">
+                                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </div>
+                                                        <span className="text-xs font-medium text-yt-text-primary">AI Replied</span>
                                                     </div>
+                                                    <p className="text-sm text-yt-text-secondary">
+                                                        {comment.replies?.[0]?.posted ? comment.replies[0].editedReply || comment.replies[0].generatedReply : "Reply was posted to YouTube."}
+                                                    </p>
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    {!replies[comment.id] && !generating[comment.id] && (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => handleGenerateReply(comment.id, comment.text)}
+                                                                className="text-sm text-yt-blue font-medium hover:bg-yt-blue-subtle px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+                                                            >
+                                                                ✨ Generate Reply
+                                                            </button>
+                                                            {genError[comment.id] && (
+                                                                <span className="text-xs text-yt-error-text">{genError[comment.id]}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {generating[comment.id] && (
+                                                        <div className="flex items-center gap-2 text-sm text-yt-text-secondary px-3 py-1.5">
+                                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                            </svg>
+                                                            Generating AI reply...
+                                                        </div>
+                                                    )}
+
+                                                    {replies[comment.id] && (
+                                                        <div className="space-y-2">
+                                                            <textarea
+                                                                value={replies[comment.id]}
+                                                                onChange={(e) => handleReplyChange(comment.id, e.target.value)}
+                                                                rows={3}
+                                                                className="w-full px-3 py-2 text-sm border border-yt-border rounded-lg focus:outline-none focus:border-yt-blue focus:ring-1 focus:ring-yt-blue resize-none text-yt-text-primary bg-yt-bg-elevated"
+                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => handlePost(comment.id, comment.youtubeCommentId)}
+                                                                    disabled={posted[comment.id] || posting[comment.id]}
+                                                                    className="px-4 py-1.5 bg-yt-blue text-yt-text-inverse text-sm font-medium rounded-full hover:bg-yt-blue-hover disabled:opacity-70 transition-colors cursor-pointer"
+                                                                >
+                                                                    {posting[comment.id] ? "Posting..." : posted[comment.id] ? "✓ Posted" : "Approve & Post"}
+                                                                </button>
+                                                                {postError[comment.id] && (
+                                                                    <span className="text-xs text-yt-error-text">{postError[comment.id]}</span>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setReplies((prev) => {
+                                                                            const next = { ...prev };
+                                                                            delete next[comment.id];
+                                                                            return next;
+                                                                        });
+                                                                        handleGenerateReply(comment.id, comment.text);
+                                                                    }}
+                                                                    className="px-4 py-1.5 text-sm text-yt-blue hover:bg-yt-blue-subtle rounded-full transition-colors cursor-pointer"
+                                                                >
+                                                                    ↻ Regenerate
+                                                                </button>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        setReplies((prev) => {
+                                                                            const next = { ...prev };
+                                                                            delete next[comment.id];
+                                                                            return next;
+                                                                        })
+                                                                    }
+                                                                    className="px-4 py-1.5 text-sm text-yt-text-secondary hover:bg-yt-bg-surface-hover rounded-full transition-colors cursor-pointer"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>

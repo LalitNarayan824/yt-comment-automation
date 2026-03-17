@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ──────────────────────────────────────────────
+// Users Table
+// ──────────────────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  googleId     String   @unique @map("google_id")
+  email        String
+  name         String
+  channelId    String?  @map("channel_id")
+  accessToken  String?  @map("access_token")
+  refreshToken String?  @map("refresh_token")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  videos   Video[]
+  personas Persona[]
+
+  @@map("users")
+}
+
+// ──────────────────────────────────────────────
+// Videos Table
+// ──────────────────────────────────────────────
+model Video {
+  id             String   @id @default(uuid())
+  youtubeVideoId String   @unique @map("youtube_video_id")
+  title          String
+  thumbnailUrl   String?  @map("thumbnail_url")
+  publishedAt    DateTime @map("published_at")
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id])
+  comments Comment[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("videos")
+}
+
+// ──────────────────────────────────────────────
+// Comments Table
+// ──────────────────────────────────────────────
+model Comment {
+  id               String   @id @default(uuid())
+  youtubeCommentId String   @unique @map("youtube_comment_id")
+  videoId          String   @map("video_id")
+  authorName       String   @map("author_name")
+  authorChannelId  String?  @map("author_channel_id")
+  authorProfileImage String? @map("author_profile_image")
+  text             String
+  likeCount        Int      @default(0) @map("like_count")
+  totalReplyCount  Int      @default(0) @map("total_reply_count")
+  publishedAt      DateTime @map("published_at")
+
+  // Future-proofing fields
+  intent           String?
+  sentiment        String?
+  toxicityScore    Float?   @map("toxicity_score")
+  isSpam           Boolean  @default(false) @map("is_spam")
+  moderationStatus String   @default("pending") @map("moderation_status")
+  priorityScore    Int      @default(0) @map("priority_score")
+  replied          Boolean  @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video   Video   @relation(fields: [videoId], references: [id])
+  replies Reply[]
+
+  @@index([videoId])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+// ──────────────────────────────────────────────
+// Replies Table
+// ──────────────────────────────────────────────
+model Reply {
+  id             String    @id @default(uuid())
+  commentId      String    @map("comment_id")
+  generatedReply String    @map("generated_reply")
+  editedReply    String?   @map("edited_reply")
+  posted         Boolean   @default(false)
+  postedAt       DateTime? @map("posted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  comment Comment @relation(fields: [commentId], references: [id])
+
+  @@index([commentId])
+  @@map("replies")
+}
+
+// ──────────────────────────────────────────────
+// Persona Table
+// ──────────────────────────────────────────────
+model Persona {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  tone            String?
+  emojiStyle      String?  @map("emoji_style")
+  vocabularyRules String?  @map("vocabulary_rules")
+  catchphrases    String?
+  forbiddenWords  String?  @map("forbidden_words")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("personas")
+}

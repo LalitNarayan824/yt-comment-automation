@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { NextRequest } from "next/server";
+import { getVideoByYoutubeId } from "@/lib/services/video.service";
+import { syncComments, getCommentsByVideoId } from "@/lib/services/comment.service";
 
 export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -17,6 +19,16 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+        // Find the video in the database by YouTube video ID
+        const dbVideo = await getVideoByYoutubeId(videoId);
+        if (!dbVideo) {
+            return Response.json(
+                { error: "Video not found in database. Please refresh your dashboard first." },
+                { status: 404 }
+            );
+        }
+
+        // Fetch comments from YouTube API
         const res = await fetch(
             `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance`,
             {
@@ -36,25 +48,30 @@ export async function GET(request: NextRequest) {
 
         const data = await res.json();
 
-        // Extract and structure the comments
+        // Sync comments to database
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const comments = (data.items || []).map((item: any) => {
+        const ytComments = (data.items || []).map((item: any) => {
             const snippet = item.snippet.topLevelComment.snippet;
             return {
-                id: item.snippet.topLevelComment.id,
-                author: snippet.authorDisplayName,
+                youtubeCommentId: item.snippet.topLevelComment.id,
+                authorName: snippet.authorDisplayName,
+                authorChannelId: snippet.authorChannelId?.value,
                 authorProfileImage: snippet.authorProfileImageUrl,
                 text: snippet.textDisplay,
-                likeCount: snippet.likeCount,
-                publishedAt: snippet.publishedAt,
-                totalReplyCount: item.snippet.totalReplyCount,
+                likeCount: snippet.likeCount || 0,
+                totalReplyCount: item.snippet.totalReplyCount || 0,
+                publishedAt: new Date(snippet.publishedAt),
             };
         });
 
+        await syncComments(dbVideo.id, ytComments);
+
+        // Return comments from the database (source of truth)
+        const comments = await getCommentsByVideoId(dbVideo.id);
+
         return Response.json({
             comments,
-            nextPageToken: data.nextPageToken || null,
-            totalResults: data.pageInfo?.totalResults || comments.length,
+            totalResults: comments.length,
         });
     } catch {
         return Response.json(
