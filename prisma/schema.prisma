@@ -72,6 +72,7 @@ model Comment {
   analyzedAt       DateTime? @map("analyzed_at")
   isSpam           Boolean  @default(false) @map("is_spam")
   moderationStatus String   @default("pending") @map("moderation_status")
+  isModerated      Boolean  @default(false) @map("is_moderated")
   priorityScore    Int      @default(0) @map("priority_score")
   replied          Boolean  @default(false)
 
