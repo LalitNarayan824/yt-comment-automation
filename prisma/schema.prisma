@@ -110,11 +110,13 @@ model Reply {
 model Persona {
   id              String   @id @default(uuid())
   userId          String   @map("user_id")
+  name            String
   tone            String?
   emojiStyle      String?  @map("emoji_style")
   vocabularyRules String?  @map("vocabulary_rules")
   catchphrases    String?
   forbiddenWords  String?  @map("forbidden_words")
+  isDefault       Boolean  @default(false) @map("is_default")
   createdAt       DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
