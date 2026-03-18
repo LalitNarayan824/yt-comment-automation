@@ -68,6 +68,8 @@ model Comment {
   intent           String?
   sentiment        String?
   toxicityScore    Float?   @map("toxicity_score")
+  isAnalyzed       Boolean  @default(false) @map("is_analyzed")
+  analyzedAt       DateTime? @map("analyzed_at")
   isSpam           Boolean  @default(false) @map("is_spam")
   moderationStatus String   @default("pending") @map("moderation_status")
   priorityScore    Int      @default(0) @map("priority_score")

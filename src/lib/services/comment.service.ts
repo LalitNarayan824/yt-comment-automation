@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { analyzeComment } from "./ai-analysis.service";
 
 interface YouTubeComment {
     youtubeCommentId: string;
@@ -65,3 +66,40 @@ export async function getCommentsByVideoId(videoId: string) {
 export async function getCommentByYoutubeId(youtubeCommentId: string) {
     return prisma.comment.findUnique({ where: { youtubeCommentId } });
 }
+
+/**
+ * Process unanalyzed comments for a specific video using AI
+ */
+export async function analyzeUnprocessedComments(videoId: string) {
+    const unanalyzedComments = await prisma.comment.findMany({
+        where: {
+            videoId,
+            isAnalyzed: false,
+        },
+        take: 20, // process in batches to avoid rate limits
+    });
+
+    if (unanalyzedComments.length === 0) return;
+
+    // Process them sequentially to respect rate limits
+    for (const comment of unanalyzedComments) {
+        try {
+            const result = await analyzeComment(comment.text);
+
+            await prisma.comment.update({
+                where: { id: comment.id },
+                data: {
+                    intent: result.intent,
+                    sentiment: result.sentiment,
+                    toxicityScore: result.toxicityScore,
+                    isAnalyzed: true,
+                    analyzedAt: new Date(),
+                },
+            });
+        } catch (error) {
+            console.error(`Failed to analyze comment ${comment.id}:`, error);
+            // We do not set isAnalyzed=true on total failure, letting it retry later
+        }
+    }
+}
+

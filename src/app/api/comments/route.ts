@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { NextRequest } from "next/server";
 import { getVideoByYoutubeId } from "@/lib/services/video.service";
-import { syncComments, getCommentsByVideoId } from "@/lib/services/comment.service";
+import { syncComments, getCommentsByVideoId, analyzeUnprocessedComments } from "@/lib/services/comment.service";
 
 export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -65,6 +65,9 @@ export async function GET(request: NextRequest) {
         });
 
         await syncComments(dbVideo.id, ytComments);
+
+        // Run analysis on unprocessed comments
+        await analyzeUnprocessedComments(dbVideo.id);
 
         // Return comments from the database (source of truth)
         const comments = await getCommentsByVideoId(dbVideo.id);
