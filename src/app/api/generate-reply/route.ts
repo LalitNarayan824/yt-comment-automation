@@ -2,6 +2,10 @@ import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import type { Tone, ToneInstructions } from "@/types";
 import { saveReply } from "@/lib/services/reply.service";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
+import { prisma } from "@/lib/db";
+import { getDefaultPersona } from "@/lib/services/persona.service";
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
@@ -52,6 +56,16 @@ async function generateWithRetry(prompt: string): Promise<string | undefined> {
 
 export async function POST(request: NextRequest) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session?.googleId) {
+            return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const user = await prisma.user.findUnique({ where: { googleId: session.googleId } });
+        if (!user) {
+            return Response.json({ error: "User not found" }, { status: 404 });
+        }
+
         const { commentId, commentText, tone = "friendly" }: { commentId?: string; commentText?: string; tone?: Tone } = await request.json();
 
         if (!commentId || !commentText) {
@@ -68,19 +82,35 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const toneInstructions: ToneInstructions = {
-            friendly:
-                "Reply in a warm, friendly, and conversational tone. Be enthusiastic and appreciative.",
-            professional:
-                "Reply in a polite, professional, and composed tone. Be respectful and well-articulated.",
-            humorous:
-                "Reply in a witty, lighthearted, and humorous tone. Keep it fun but respectful.",
-        };
+        const persona = await getDefaultPersona(user.id);
 
-        const toneGuide = toneInstructions[tone] || toneInstructions.friendly;
+        let toneGuide = "";
+        let personaRules = "";
+
+        if (persona) {
+            toneGuide = persona.tone ? `Tone: ${persona.tone}` : "";
+            const rules = [
+                persona.emojiStyle ? `Emoji Style: ${persona.emojiStyle}` : "",
+                persona.vocabularyRules ? `Rules: ${persona.vocabularyRules}` : "",
+                persona.catchphrases ? `Catchphrases: ${persona.catchphrases}` : "",
+                persona.forbiddenWords ? `Avoid these words: ${persona.forbiddenWords}` : ""
+            ].filter(Boolean).join("\n");
+
+            if (rules) {
+                personaRules = `\nGuidelines:\n${rules}`;
+            }
+        } else {
+            // Fallback to basic tone strings
+            const toneInstructions: ToneInstructions = {
+                friendly: "Reply in a warm, friendly, and conversational tone. Be enthusiastic and appreciative.",
+                professional: "Reply in a polite, professional, and composed tone. Be respectful and well-articulated.",
+                humorous: "Reply in a witty, lighthearted, and humorous tone. Keep it fun but respectful.",
+            };
+            toneGuide = toneInstructions[tone] || toneInstructions.friendly;
+        }
 
         const prompt = `You are a YouTube content creator replying to a comment on your video.
-${toneGuide}
+${toneGuide}${personaRules}
 Keep the reply under 2-3 sentences. Do not use hashtags. Do not use emojis excessively.
 Reply directly — do not include any prefix like "Reply:" or quotes.
 

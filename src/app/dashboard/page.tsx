@@ -87,19 +87,25 @@ export default function DashboardPage() {
             {/* Navbar */}
             <nav className="bg-yt-bg-surface border-b border-yt-border sticky top-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-5.5 bg-yt-red rounded flex items-center justify-center">
-                            <svg
-                                className="w-3 h-3 text-yt-text-inverse ml-0.5"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-5.5 bg-yt-red rounded flex items-center justify-center">
+                                <svg
+                                    className="w-3 h-3 text-yt-text-inverse ml-0.5"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </div>
+                            <span className="text-lg font-semibold text-yt-text-primary">
+                                CommentAI
+                            </span>
                         </div>
-                        <span className="text-lg font-semibold text-yt-text-primary">
-                            CommentAI
-                        </span>
+                        <div className="hidden sm:flex items-center gap-4">
+                            <a href="/dashboard" className="text-sm font-medium text-yt-text-primary">Dashboard</a>
+                            <a href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</a>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-3">

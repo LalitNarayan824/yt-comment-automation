@@ -509,6 +509,7 @@ Personality
 Persona Table
 id                String (UUID)
 user_id           String
+name              String
 tone              String
 emoji_style       String
 vocabulary_rules  String
@@ -645,6 +646,7 @@ Features:
 
 Persona Form Fields
 
+name (text)
 Tone (dropdown)
 
 Emoji Style (dropdown)
