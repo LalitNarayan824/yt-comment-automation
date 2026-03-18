@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { analyzeComment } from "./ai-analysis.service";
+import { moderateComment } from "./moderation.service";
 
 interface YouTubeComment {
     youtubeCommentId: string;
@@ -84,16 +85,20 @@ export async function analyzeUnprocessedComments(videoId: string) {
     // Process them sequentially to respect rate limits
     for (const comment of unanalyzedComments) {
         try {
-            const result = await analyzeComment(comment.text);
+            const aiResult = await analyzeComment(comment.text);
+            const modResult = moderateComment(comment.text, aiResult.toxicityScore);
 
             await prisma.comment.update({
                 where: { id: comment.id },
                 data: {
-                    intent: result.intent,
-                    sentiment: result.sentiment,
-                    toxicityScore: result.toxicityScore,
+                    intent: aiResult.intent,
+                    sentiment: aiResult.sentiment,
+                    toxicityScore: aiResult.toxicityScore,
                     isAnalyzed: true,
                     analyzedAt: new Date(),
+                    isSpam: modResult.is_spam,
+                    moderationStatus: modResult.moderation_status,
+                    isModerated: modResult.is_moderated,
                 },
             });
         } catch (error) {

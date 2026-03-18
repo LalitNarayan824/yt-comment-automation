@@ -23,6 +23,7 @@ export default function VideoCommentsPage() {
     const [error, setError] = useState<string | null>(null);
     const [tone, setTone] = useState<Tone>("friendly");
     const [genError, setGenError] = useState<Record<string, string | null>>({});
+    const [filter, setFilter] = useState<"approved" | "flagged" | "blocked" | "all">("approved");
 
     // Auto-fetch comments when page loads
     useEffect(() => {
@@ -145,6 +146,8 @@ export default function VideoCommentsPage() {
         return "just now";
     };
 
+    const filteredComments = comments.filter((c: any) => filter === "all" || c.moderationStatus === filter);
+
     return (
         <div className="min-h-screen bg-yt-bg-page">
             {/* Navbar */}
@@ -243,9 +246,20 @@ export default function VideoCommentsPage() {
                 {/* Comment Cards */}
                 {fetched && !loading && comments.length > 0 && (
                     <div className="space-y-4">
+                        <div className="flex border-b border-yt-border mb-4">
+                            {(["approved", "flagged", "blocked", "all"] as const).map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setFilter(tab)}
+                                    className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${filter === tab ? "border-b-2 border-yt-blue text-yt-blue" : "text-yt-text-secondary hover:text-yt-text-primary"}`}
+                                >
+                                    {tab === "approved" ? "✅ Approved" : tab === "flagged" ? "⚠️ Flagged" : tab === "blocked" ? "❌ Blocked" : "All"}
+                                </button>
+                            ))}
+                        </div>
                         <div className="flex items-center justify-between mb-4">
                             <p className="text-sm text-yt-text-secondary">
-                                {comments.length} comments loaded
+                                {filteredComments.length} comments shown
                             </p>
                             <div className="flex items-center gap-1 bg-yt-bg-elevated rounded-full p-1">
                                 {(["friendly", "professional", "humorous"] as Tone[]).map((t) => (
@@ -262,7 +276,7 @@ export default function VideoCommentsPage() {
                                 ))}
                             </div>
                         </div>
-                        {comments.map((comment) => (
+                        {filteredComments.map((comment: any) => (
                             <div
                                 key={comment.id}
                                 className="bg-yt-bg-surface rounded-lg border border-yt-border p-4"
@@ -286,13 +300,31 @@ export default function VideoCommentsPage() {
 
                                     {/* Comment Content */}
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex flex-wrap items-center gap-2 mb-1">
                                             <span className="text-sm font-medium text-yt-text-primary">
                                                 @{comment.authorName}
                                             </span>
                                             <span className="text-xs text-yt-text-secondary">
                                                 {formatTimeAgo(comment.publishedAt as string)}
                                             </span>
+                                            {/* Moderation Badges */}
+                                            {comment.isModerated && (
+                                                <div className="flex items-center gap-1.5 ml-2">
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${comment.moderationStatus === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : comment.moderationStatus === 'blocked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500'}`}>
+                                                        {comment.moderationStatus?.toUpperCase()}
+                                                    </span>
+                                                    {(comment.toxicityScore !== null && comment.toxicityScore !== undefined) && (
+                                                        <span className="text-[10px] bg-yt-bg-elevated text-yt-text-secondary px-1.5 py-0.5 rounded border border-yt-border">
+                                                            Toxicity: {(comment.toxicityScore * 100).toFixed(0)}%
+                                                        </span>
+                                                    )}
+                                                    {comment.isSpam && (
+                                                        <span className="text-[10px] bg-yt-error-bg text-yt-error-text px-1.5 py-0.5 rounded border border-yt-error-border">
+                                                            SPAM
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         <p
                                             className="text-sm text-yt-text-primary leading-relaxed mb-3"
