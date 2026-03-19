@@ -5,6 +5,14 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import type { Comment, Tone } from "@/types";
 
+interface VideoContext {
+    title: string;
+    description: string | null;
+    aiSummary: string | null;
+    creatorContext: string | null;
+    creatorSummary: string | null;
+}
+
 export default function VideoCommentsPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -25,10 +33,20 @@ export default function VideoCommentsPage() {
     const [genError, setGenError] = useState<Record<string, string | null>>({});
     const [filter, setFilter] = useState<"approved" | "flagged" | "blocked" | "all">("approved");
 
+    // Video Context State
+    const [videoCtx, setVideoCtx] = useState<VideoContext | null>(null);
+    const [isEditingContext, setIsEditingContext] = useState(false);
+    const [editContextText, setEditContextText] = useState("");
+    const [editSummaryText, setEditSummaryText] = useState("");
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [isSavingContext, setIsSavingContext] = useState(false);
+    const [showContextPanel, setShowContextPanel] = useState(false);
+
     // Auto-fetch comments when page loads
     useEffect(() => {
         if (status === "authenticated" && videoId) {
             handleFetchComments();
+            handleFetchContext();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, videoId]);
@@ -68,6 +86,63 @@ export default function VideoCommentsPage() {
         } finally {
             setLoading(false);
             setFetched(true);
+        }
+    };
+
+    const handleFetchContext = async () => {
+        try {
+            const res = await fetch(`/api/videos/${videoId}/context`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.video) {
+                    setVideoCtx({
+                        title: data.video.title,
+                        description: data.video.description,
+                        aiSummary: data.video.aiSummary,
+                        creatorContext: data.video.creatorContext,
+                        creatorSummary: data.video.creatorSummary,
+                    });
+                    setEditContextText(data.video.creatorContext || "");
+                    setEditSummaryText(data.video.creatorSummary || "");
+                }
+            }
+        } catch {
+            console.error("Failed to fetch video context");
+        }
+    };
+
+    const handleSaveContext = async () => {
+        setIsSavingContext(true);
+        try {
+            const res = await fetch(`/api/videos/${videoId}/context`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ creatorContext: editContextText, creatorSummary: editSummaryText })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setVideoCtx(prev => prev ? {
+                    ...prev,
+                    creatorContext: data.video.creatorContext,
+                    creatorSummary: data.video.creatorSummary
+                } : null);
+                setIsEditingContext(false);
+            }
+        } finally {
+            setIsSavingContext(false);
+        }
+    };
+
+    const handleGenerateSummary = async () => {
+        setIsGeneratingSummary(true);
+        try {
+            const res = await fetch(`/api/videos/${videoId}/summary`, { method: "POST" });
+            if (res.ok) {
+                const data = await res.json();
+                setVideoCtx(prev => prev ? { ...prev, aiSummary: data.video.aiSummary } : null);
+            }
+        } finally {
+            setIsGeneratingSummary(false);
         }
     };
 
@@ -193,6 +268,96 @@ export default function VideoCommentsPage() {
             </nav>
 
             <main className="max-w-5xl mx-auto px-4 py-6">
+                {/* Context Panel Toggle */}
+                <div className="mb-6">
+                    <button onClick={() => setShowContextPanel(!showContextPanel)} className="w-full bg-yt-bg-surface border border-yt-border rounded-lg p-4 flex items-center justify-between hover:bg-yt-bg-elevated transition-colors">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-bold text-yt-text-primary">🧠 Video Context Engine</span>
+                            {videoCtx?.aiSummary || videoCtx?.creatorContext ? <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full font-bold">ACTIVE</span> : null}
+                        </div>
+                        <svg className={`w-5 h-5 text-yt-icon-muted transition-transform ${showContextPanel ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {showContextPanel && videoCtx && (
+                        <div className="mt-2 bg-yt-bg-surface border border-yt-border rounded-lg p-5 shadow-sm space-y-5">
+                            <div>
+                                <h3 className="text-lg font-semibold text-yt-text-primary">{videoCtx.title}</h3>
+                                {videoCtx.description && <p className="text-sm text-yt-text-secondary mt-1 max-h-24 overflow-y-auto w-full pr-2 break-words" style={{ scrollbarWidth: "thin" }}>{videoCtx.description}</p>}
+                            </div>
+
+                            <div className="border-t border-yt-border pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-yt-text-primary uppercase tracking-wider">AI Summary</h4>
+                                    <button onClick={handleGenerateSummary} disabled={isGeneratingSummary} className="text-xs font-semibold bg-yt-blue hover:bg-yt-blue-hover text-yt-text-inverse px-3 py-1.5 rounded-full transition-colors disabled:opacity-50">
+                                        {isGeneratingSummary ? "Generating..." : (videoCtx.aiSummary ? "Regenerate" : "Generate Summary")}
+                                    </button>
+                                </div>
+                                {videoCtx.aiSummary ? (
+                                    <div className="bg-yt-bg-elevated p-3 rounded-md border border-yt-border text-sm text-yt-text-primary leading-relaxed whitespace-pre-wrap">
+                                        {videoCtx.aiSummary}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-yt-text-secondary italic">No summary generated yet. Generates a 3-5 line summary to save tokens and improve AI context awareness.</p>
+                                )}
+                            </div>
+
+                            <div className="border-t border-yt-border pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-bold text-yt-text-primary uppercase tracking-wider">Creator Notes</h4>
+                                    {!isEditingContext && (
+                                        <button onClick={() => setIsEditingContext(true)} className="text-xs font-semibold text-yt-blue hover:text-yt-blue-hover transition-colors">Edit Notes</button>
+                                    )}
+                                </div>
+                                {isEditingContext ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-yt-text-secondary mb-1">Creator Notes</label>
+                                            <textarea value={editContextText} onChange={e => setEditContextText(e.target.value)} rows={2} placeholder="e.g. This video is for beginners. Focus on performance optimization..." className="w-full px-3 py-2 bg-yt-bg-elevated border border-yt-border rounded-md text-sm text-yt-text-primary focus:outline-none focus:ring-1 focus:ring-yt-blue" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-yt-text-secondary mb-1">Creator's Summary</label>
+                                            <p className="text-[11px] text-yt-text-secondary mb-1">Provide a creator's summary for the video to improve the LLM generated summary</p>
+                                            <textarea value={editSummaryText} onChange={e => setEditSummaryText(e.target.value)} rows={2} placeholder="e.g. A quick crash course on React Hooks aimed at absolute beginners..." className="w-full px-3 py-2 bg-yt-bg-elevated border border-yt-border rounded-md text-sm text-yt-text-primary focus:outline-none focus:ring-1 focus:ring-yt-blue" />
+                                        </div>
+                                        <div className="flex items-center justify-end gap-2 pt-2">
+                                            <button onClick={() => { setIsEditingContext(false); setEditContextText(videoCtx.creatorContext || ""); setEditSummaryText(videoCtx.creatorSummary || ""); }} className="text-xs px-3 py-1.5 text-yt-text-secondary hover:bg-yt-bg-elevated rounded-md transition-colors">Cancel</button>
+                                            <button onClick={handleSaveContext} disabled={isSavingContext} className="text-xs font-semibold bg-yt-text-primary text-yt-text-inverse px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50">
+                                                {isSavingContext ? "Saving..." : "Save Notes"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {videoCtx.creatorContext ? (
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-yt-text-secondary mb-1">Creator Notes</h5>
+                                                <div className="text-sm text-yt-text-primary bg-yt-bg-elevated p-3 rounded-md border border-yt-border whitespace-pre-wrap">
+                                                    {videoCtx.creatorContext}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {videoCtx.creatorSummary ? (
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-yt-text-secondary mb-1">Creator's Summary</h5>
+                                                <div className="text-sm text-yt-text-primary bg-yt-bg-elevated p-3 rounded-md border border-yt-border whitespace-pre-wrap">
+                                                    {videoCtx.creatorSummary}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {!videoCtx.creatorContext && !videoCtx.creatorSummary && (
+                                            <div className="space-y-1">
+                                                <p className="text-sm text-yt-text-secondary italic">Add custom notes about this video to instruct the AI exactly how to respond universally across all comments.</p>
+                                                <p className="text-sm text-yt-text-secondary italic text-[11px] mt-1">Please ask the creator to provide a creator's summary for the video to improve the LLM generated summary.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Error */}
                 {error && (
                     <div className="bg-yt-error-bg border border-yt-error-border text-yt-error-text text-sm rounded-lg p-4 mb-6 flex items-center justify-between">
