@@ -70,7 +70,8 @@ export async function GET(request: NextRequest) {
         await analyzeUnprocessedComments(dbVideo.id);
 
         // Return comments from the database (source of truth)
-        const comments = await getCommentsByVideoId(dbVideo.id);
+        const sort = request.nextUrl.searchParams.get('sort') === 'priority' ? 'priority' : 'recent';
+        const comments = await getCommentsByVideoId(dbVideo.id, sort);
 
         return Response.json({
             comments,

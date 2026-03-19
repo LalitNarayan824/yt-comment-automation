@@ -48,7 +48,7 @@ export async function syncComments(videoId: string, comments: YouTubeComment[]) 
 /**
  * Get all comments for a video from the database, with their latest reply.
  */
-export async function getCommentsByVideoId(videoId: string) {
+export async function getCommentsByVideoId(videoId: string, sort: 'recent' | 'priority' = 'recent') {
     return prisma.comment.findMany({
         where: { videoId },
         include: {
@@ -57,7 +57,9 @@ export async function getCommentsByVideoId(videoId: string) {
                 take: 1,
             },
         },
-        orderBy: { publishedAt: "desc" },
+        orderBy: sort === 'priority'
+            ? [{ priorityScore: 'desc' }, { publishedAt: 'desc' }]
+            : { publishedAt: "desc" },
     });
 }
 
@@ -88,12 +90,21 @@ export async function analyzeUnprocessedComments(videoId: string) {
             const aiResult = await analyzeComment(comment.text);
             const modResult = moderateComment(comment.text, aiResult.toxicityScore);
 
+            let priorityScore = (comment.likeCount || 0) * 2;
+            if (aiResult.intent === 'question') priorityScore += 3;
+            else if (aiResult.intent === 'criticism') priorityScore += 2;
+            else if (aiResult.intent === 'praise') priorityScore += 1;
+
+            if (aiResult.sentiment === 'negative') priorityScore += 2;
+            else if (aiResult.sentiment === 'positive') priorityScore += 1;
+
             await prisma.comment.update({
                 where: { id: comment.id },
                 data: {
                     intent: aiResult.intent,
                     sentiment: aiResult.sentiment,
                     toxicityScore: aiResult.toxicityScore,
+                    priorityScore,
                     isAnalyzed: true,
                     analyzedAt: new Date(),
                     isSpam: modResult.is_spam,
