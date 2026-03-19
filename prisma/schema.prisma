@@ -33,13 +33,19 @@ model User {
 // Videos Table
 // ──────────────────────────────────────────────
 model Video {
-  id             String   @id @default(uuid())
-  youtubeVideoId String   @unique @map("youtube_video_id")
-  title          String
-  thumbnailUrl   String?  @map("thumbnail_url")
-  publishedAt    DateTime @map("published_at")
-  userId         String   @map("user_id")
-  createdAt      DateTime @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  youtubeVideoId   String    @unique @map("youtube_video_id")
+  title            String
+  description      String?
+  aiSummary        String?   @map("ai_summary")
+  creatorContext   String?   @map("creator_context")
+  creatorSummary   String?   @map("creator_summary")
+  contextUpdatedAt DateTime? @map("context_updated_at")
+  summaryGenerated Boolean   @default(false) @map("summary_generated")
+  thumbnailUrl     String?   @map("thumbnail_url")
+  publishedAt      DateTime  @map("published_at")
+  userId           String    @map("user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   user     User      @relation(fields: [userId], references: [id])
   comments Comment[]

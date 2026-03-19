@@ -83,6 +83,14 @@ export async function POST(request: NextRequest) {
         }
 
         const persona = await getDefaultPersona(user.id);
+        const comment = await prisma.comment.findUnique({
+            where: { id: commentId },
+            include: { video: true }
+        });
+
+        if (!comment) {
+            return Response.json({ error: "Comment not found" }, { status: 404 });
+        }
 
         let toneGuide = "";
         let personaRules = "";
@@ -109,8 +117,16 @@ export async function POST(request: NextRequest) {
             toneGuide = toneInstructions[tone] || toneInstructions.friendly;
         }
 
+        let videoContextStr = "";
+        if (comment.video?.aiSummary) {
+            videoContextStr = `\n=== VIDEO CONTEXT ===\nSummary: ${comment.video.aiSummary}\n`;
+        }
+
         const prompt = `You are a YouTube content creator replying to a comment on your video.
+=== PERSONA ===
 ${toneGuide}${personaRules}
+${videoContextStr}
+=== TASK ===
 Keep the reply under 2-3 sentences. Do not use hashtags. Do not use emojis excessively.
 Reply directly — do not include any prefix like "Reply:" or quotes.
 

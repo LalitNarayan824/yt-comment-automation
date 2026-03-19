@@ -44,6 +44,7 @@ export async function GET() {
             await saveOrUpdateVideo({
                 youtubeVideoId: item.id.videoId,
                 title: item.snippet.title,
+                description: item.snippet.description,
                 thumbnailUrl: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
                 publishedAt: new Date(item.snippet.publishedAt),
                 userId: dbUser.id,
