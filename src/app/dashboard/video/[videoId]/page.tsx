@@ -32,6 +32,7 @@ export default function VideoCommentsPage() {
     const [tone, setTone] = useState<Tone>("friendly");
     const [genError, setGenError] = useState<Record<string, string | null>>({});
     const [filter, setFilter] = useState<"approved" | "flagged" | "blocked" | "all">("approved");
+    const [sort, setSort] = useState<"recent" | "priority">("priority");
 
     // Video Context State
     const [videoCtx, setVideoCtx] = useState<VideoContext | null>(null);
@@ -49,7 +50,7 @@ export default function VideoCommentsPage() {
             handleFetchContext();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, videoId]);
+    }, [status, videoId, sort]);
 
     if (status === "loading") {
         return (
@@ -73,7 +74,7 @@ export default function VideoCommentsPage() {
         setError(null);
 
         try {
-            const res = await fetch(`/api/comments?videoId=${videoId}`);
+            const res = await fetch(`/api/comments?videoId=${videoId}&sort=${sort}`);
             const data = await res.json();
 
             if (!res.ok) {
@@ -417,16 +418,25 @@ export default function VideoCommentsPage() {
                 {/* Comment Cards */}
                 {fetched && !loading && comments.length > 0 && (
                     <div className="space-y-4">
-                        <div className="flex border-b border-yt-border mb-4">
-                            {(["approved", "flagged", "blocked", "all"] as const).map(tab => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setFilter(tab)}
-                                    className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${filter === tab ? "border-b-2 border-yt-blue text-yt-blue" : "text-yt-text-secondary hover:text-yt-text-primary"}`}
-                                >
-                                    {tab === "approved" ? "✅ Approved" : tab === "flagged" ? "⚠️ Flagged" : tab === "blocked" ? "❌ Blocked" : "All"}
-                                </button>
-                            ))}
+                        <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-yt-border mb-4 pb-2 gap-3">
+                            <div className="flex overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
+                                {(["approved", "flagged", "blocked", "all"] as const).map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setFilter(tab)}
+                                        className={`px-4 py-2 text-sm font-medium capitalize transition-colors whitespace-nowrap ${filter === tab ? "border-b-2 border-yt-blue text-yt-blue" : "text-yt-text-secondary hover:text-yt-text-primary"}`}
+                                    >
+                                        {tab === "approved" ? "✅ Approved" : tab === "flagged" ? "⚠️ Flagged" : tab === "blocked" ? "❌ Blocked" : "All"}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2shrink-0">
+                                <span className="text-xs text-yt-text-secondary font-medium">Sort by:</span>
+                                <div className="flex bg-yt-bg-elevated rounded-lg p-0.5 border border-yt-border">
+                                    <button onClick={() => setSort('priority')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${sort === 'priority' ? 'bg-yt-bg-surface text-yt-text-primary shadow-sm' : 'text-yt-text-secondary hover:text-yt-text-primary'}`}>🔥 Priority</button>
+                                    <button onClick={() => setSort('recent')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${sort === 'recent' ? 'bg-yt-bg-surface text-yt-text-primary shadow-sm' : 'text-yt-text-secondary hover:text-yt-text-primary'}`}>⏱️ Recent</button>
+                                </div>
+                            </div>
                         </div>
                         <div className="flex items-center justify-between mb-4">
                             <p className="text-sm text-yt-text-secondary">
@@ -480,6 +490,11 @@ export default function VideoCommentsPage() {
                                             </span>
                                             {/* Analysis & Moderation Badges */}
                                             <div className="flex flex-wrap items-center gap-1.5 ml-2 mt-1 sm:mt-0">
+                                                {(comment.priorityScore > 0) && (
+                                                    <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded border border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 flex items-center gap-1">
+                                                        🔥 Priority: {comment.priorityScore}
+                                                    </span>
+                                                )}
                                                 {comment.intent && (
                                                     <span className="text-[10px] bg-yt-blue/10 text-yt-blue px-1.5 py-0.5 rounded border border-yt-blue/20 capitalize font-medium">
                                                         {comment.intent}
@@ -487,8 +502,8 @@ export default function VideoCommentsPage() {
                                                 )}
                                                 {comment.sentiment && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded border capitalize font-medium ${comment.sentiment === 'positive' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50' :
-                                                            comment.sentiment === 'negative' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50' :
-                                                                'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                                        comment.sentiment === 'negative' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50' :
+                                                            'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
                                                         }`}>
                                                         {comment.sentiment}
                                                     </span>
@@ -496,8 +511,8 @@ export default function VideoCommentsPage() {
                                                 {comment.isModerated && (
                                                     <>
                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${comment.moderationStatus === 'approved' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
-                                                                comment.moderationStatus === 'blocked' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
-                                                                    'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-500 dark:border-yellow-800'
+                                                            comment.moderationStatus === 'blocked' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
+                                                                'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-500 dark:border-yellow-800'
                                                             }`}>
                                                             {comment.moderationStatus?.toUpperCase()}
                                                         </span>
