@@ -51,6 +51,12 @@ Summarize this YouTube video in 3-5 lines:
 Title: ${title}
 Description: ${description ? description.slice(0, 1500) : "No description available."}
 ${creatorSummary ? `Creator's Summary/Notes: ${creatorSummary}\nPlease thoroughly weave the creator's summary/notes into your final 3-5 line summary so it encapsulates all the necessary context.` : ""}
+
+IMPORTANT INSTRUCTIONS:
+- ONLY output the summary text itself.
+- Do NOT output conversational filler like "Here is a summary:" or "Unfortunately, there is no video content...".
+- If the description is missing or extremely short, just base the summary heavily on the Title and Creator's Summary, do not complain about missing content.
+- If there is truly zero usable info, output this exactly: "Not enough info to summarize: please provide a Creator's Summary."
 `;
 
     const completion = await groq.chat.completions.create({

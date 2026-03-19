@@ -478,24 +478,42 @@ export default function VideoCommentsPage() {
                                             <span className="text-xs text-yt-text-secondary">
                                                 {formatTimeAgo(comment.publishedAt as string)}
                                             </span>
-                                            {/* Moderation Badges */}
-                                            {comment.isModerated && (
-                                                <div className="flex items-center gap-1.5 ml-2">
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${comment.moderationStatus === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : comment.moderationStatus === 'blocked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500'}`}>
-                                                        {comment.moderationStatus?.toUpperCase()}
+                                            {/* Analysis & Moderation Badges */}
+                                            <div className="flex flex-wrap items-center gap-1.5 ml-2 mt-1 sm:mt-0">
+                                                {comment.intent && (
+                                                    <span className="text-[10px] bg-yt-blue/10 text-yt-blue px-1.5 py-0.5 rounded border border-yt-blue/20 capitalize font-medium">
+                                                        {comment.intent}
                                                     </span>
-                                                    {(comment.toxicityScore !== null && comment.toxicityScore !== undefined) && (
-                                                        <span className="text-[10px] bg-yt-bg-elevated text-yt-text-secondary px-1.5 py-0.5 rounded border border-yt-border">
-                                                            Toxicity: {(comment.toxicityScore * 100).toFixed(0)}%
+                                                )}
+                                                {comment.sentiment && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border capitalize font-medium ${comment.sentiment === 'positive' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50' :
+                                                            comment.sentiment === 'negative' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50' :
+                                                                'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                                        }`}>
+                                                        {comment.sentiment}
+                                                    </span>
+                                                )}
+                                                {comment.isModerated && (
+                                                    <>
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${comment.moderationStatus === 'approved' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                                                                comment.moderationStatus === 'blocked' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
+                                                                    'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-500 dark:border-yellow-800'
+                                                            }`}>
+                                                            {comment.moderationStatus?.toUpperCase()}
                                                         </span>
-                                                    )}
-                                                    {comment.isSpam && (
-                                                        <span className="text-[10px] bg-yt-error-bg text-yt-error-text px-1.5 py-0.5 rounded border border-yt-error-border">
-                                                            SPAM
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
+                                                        {(comment.toxicityScore !== null && comment.toxicityScore !== undefined) && (
+                                                            <span className="text-[10px] bg-yt-bg-elevated text-yt-text-secondary px-1.5 py-0.5 rounded border border-yt-border">
+                                                                Toxicity: {(comment.toxicityScore * 100).toFixed(0)}%
+                                                            </span>
+                                                        )}
+                                                        {comment.isSpam && (
+                                                            <span className="text-[10px] bg-yt-error-bg text-yt-error-text px-1.5 py-0.5 rounded border border-yt-error-border">
+                                                                SPAM
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                         <p
                                             className="text-sm text-yt-text-primary leading-relaxed mb-3"

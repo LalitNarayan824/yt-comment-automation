@@ -126,11 +126,20 @@ export async function POST(request: NextRequest) {
 === PERSONA ===
 ${toneGuide}${personaRules}
 ${videoContextStr}
-=== TASK ===
-Keep the reply under 2-3 sentences. Do not use hashtags. Do not use emojis excessively.
-Reply directly — do not include any prefix like "Reply:" or quotes.
+=== COMMENT ANALYSIS ===
+Intent: ${comment.intent || "neutral"}
+Sentiment: ${comment.sentiment || "neutral"}
 
-Comment: "${commentText}"`;
+=== INSTRUCTIONS ===
+- If question → answer clearly
+- If praise → show gratitude
+- If criticism → respond politely and empathetically
+- Keep the reply under 2-3 sentences. Do not use hashtags. Do not use emojis excessively.
+- Stay relevant to the video topic. Sound human, not robotic.
+- Reply directly — do not include any prefix like "Reply:" or quotes.
+
+=== COMMENT ===
+"${commentText}"`;
 
         const generatedReplyText = await generateWithRetry(prompt);
 
