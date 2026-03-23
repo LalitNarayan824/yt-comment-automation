@@ -254,13 +254,22 @@ export default function VideoCommentsPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="text-sm text-yt-text-secondary">
+                        <div className="text-sm text-yt-text-secondary hidden sm:block">
                             Video: <span className="font-mono text-yt-text-primary">{videoId}</span>
                         </div>
                         <button
+                            onClick={() => router.push(`/analytics?videoId=${videoId}`)}
+                            className="text-sm bg-yt-bg-elevated hover:bg-yt-bg-surface-hover border border-yt-border text-yt-text-primary font-medium px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4 text-yt-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Analytics
+                        </button>
+                        <button
                             onClick={handleFetchComments}
                             disabled={loading}
-                            className="text-sm text-yt-blue hover:text-yt-blue-hover font-medium transition-colors cursor-pointer disabled:opacity-50"
+                            className="text-sm bg-yt-blue hover:bg-yt-blue-hover text-white font-medium px-3 py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50"
                         >
                             {loading ? "Refreshing..." : "↻ Refresh"}
                         </button>
