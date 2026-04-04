@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { analyzeComment } from "./ai-analysis.service";
 import { moderateComment } from "./moderation.service";
 
 interface YouTubeComment {
@@ -71,7 +70,7 @@ export async function getCommentByYoutubeId(youtubeCommentId: string) {
 }
 
 /**
- * Process unanalyzed comments for a specific video using AI
+ * Process unanalyzed comments for a specific video using ML service in batches
  */
 export async function analyzeUnprocessedComments(videoId: string) {
     const unanalyzedComments = await prisma.comment.findMany({
@@ -79,43 +78,75 @@ export async function analyzeUnprocessedComments(videoId: string) {
             videoId,
             isAnalyzed: false,
         },
-        take: 20, // process in batches to avoid rate limits
     });
 
     if (unanalyzedComments.length === 0) return;
 
-    // Process them sequentially to respect rate limits
-    for (const comment of unanalyzedComments) {
-        try {
-            const aiResult = await analyzeComment(comment.text);
-            const modResult = moderateComment(comment.text, aiResult.toxicityScore);
+    const mlServiceUrl = process.env.ML_SERVICE_URL;
+    const mlServiceKey = process.env.ML_SERVICE_KEY;
 
-            let priorityScore = (comment.likeCount || 0) * 2;
-            if (aiResult.intent === 'question') priorityScore += 3;
-            else if (aiResult.intent === 'criticism') priorityScore += 2;
-            else if (aiResult.intent === 'praise') priorityScore += 1;
+    if (!mlServiceUrl || !mlServiceKey) {
+        console.error("ML service configuration is missing");
+        return;
+    }
 
-            if (aiResult.sentiment === 'negative') priorityScore += 2;
-            else if (aiResult.sentiment === 'positive') priorityScore += 1;
+    try {
+        const BATCH_SIZE = 15;
+        for (let batchStart = 0; batchStart < unanalyzedComments.length; batchStart += BATCH_SIZE) {
+            const batch = unanalyzedComments.slice(batchStart, batchStart + BATCH_SIZE);
+            const payload = batch.map(c => ({ text: c.text }));
 
-            await prisma.comment.update({
-                where: { id: comment.id },
-                data: {
-                    intent: aiResult.intent,
-                    sentiment: aiResult.sentiment,
-                    toxicityScore: aiResult.toxicityScore,
-                    priorityScore,
-                    isAnalyzed: true,
-                    analyzedAt: new Date(),
-                    isSpam: modResult.is_spam,
-                    moderationStatus: modResult.moderation_status,
-                    isModerated: modResult.is_moderated,
+            const response = await fetch(`${mlServiceUrl}/analyze-batch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${mlServiceKey}`,
                 },
+                body: JSON.stringify(payload),
             });
-        } catch (error) {
-            console.error(`Failed to analyze comment ${comment.id}:`, error);
-            // We do not set isAnalyzed=true on total failure, letting it retry later
+
+            if (!response.ok) {
+                console.error(`ML Service responded with status: ${response.status} for batch starting at ${batchStart}`);
+                continue;
+            }
+
+            const batchResults = await response.json();
+
+            for (let i = 0; i < batch.length; i++) {
+                const comment = batch[i];
+                const aiResult = batchResults[i];
+
+                if (!aiResult) continue;
+
+                const modResult = moderateComment(aiResult.toxicity, aiResult.is_spam);
+
+                let priorityScore = (comment.likeCount || 0) * 2;
+                if (aiResult.intent === 'question') priorityScore += 3;
+                else if (aiResult.intent === 'criticism') priorityScore += 2;
+                else if (aiResult.intent === 'praise' || aiResult.intent === 'appreciation') priorityScore += 1;
+
+                if (aiResult.sentiment === 'negative') priorityScore += 2;
+                else if (aiResult.sentiment === 'positive') priorityScore += 1;
+
+                await prisma.comment.update({
+                    where: { id: comment.id },
+                    data: {
+                        intent: aiResult.intent,
+                        sentiment: aiResult.sentiment,
+                        toxicityScore: aiResult.toxicity,
+                        priorityScore,
+                        isAnalyzed: true,
+                        analyzedAt: new Date(),
+                        isSpam: modResult.is_spam,
+                        moderationStatus: modResult.moderation_status,
+                        isModerated: modResult.is_moderated,
+                    },
+                });
+            }
         }
+    } catch (error) {
+        console.error(`Failed to analyze comments batch for video ${videoId}:`, error);
+        // We do not set isAnalyzed=true on total failure, letting it retry later
     }
 }
 
