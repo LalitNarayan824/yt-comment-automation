@@ -76,3 +76,15 @@ export interface Video {
 export type Tone = "friendly" | "professional" | "humorous";
 
 export type ToneInstructions = Record<Tone, string>;
+
+export interface Persona {
+    id: string;
+    name: string;
+    tone: string | null;
+    emojiStyle: string | null;
+    vocabularyRules: string | null;
+    catchphrases: string | null;
+    forbiddenWords: string | null;
+    isDefault: boolean;
+    createdAt: string;
+}

@@ -3,25 +3,16 @@
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-
-interface Persona {
-    id: string;
-    name: string;
-    tone: string | null;
-    emojiStyle: string | null;
-    vocabularyRules: string | null;
-    catchphrases: string | null;
-    forbiddenWords: string | null;
-    isDefault: boolean;
-    createdAt: string;
-}
+import Link from "next/link";
+import { useYouTubeStore } from "@/store/useYouTubeStore";
+import type { Persona } from "@/types";
 
 export default function PersonasPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
 
-    const [personas, setPersonas] = useState<Persona[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const { personas, isPersonasFetched, setPersonas } = useYouTubeStore();
+    const [loading, setLoading] = useState<boolean>(!isPersonasFetched);
     const [error, setError] = useState<string | null>(null);
 
     // Form state
@@ -37,8 +28,14 @@ export default function PersonasPage() {
         isDefault: false
     });
 
-    const fetchPersonas = async () => {
-        setLoading(true);
+    const fetchPersonas = async (forceRefetch = false) => {
+        if (!forceRefetch && isPersonasFetched) {
+            setLoading(false);
+            return;
+        }
+        if (personas.length === 0) {
+            setLoading(true);
+        }
         try {
             const res = await fetch("/api/personas");
             const data = await res.json();
@@ -98,7 +95,7 @@ export default function PersonasPage() {
                     vocabularyRules: "", catchphrases: "", forbiddenWords: "", isDefault: false
                 });
                 setShowForm(false);
-                fetchPersonas();
+                fetchPersonas(true);
             }
         } catch {
             setError("Network error creating persona");
@@ -115,7 +112,7 @@ export default function PersonasPage() {
                 body: JSON.stringify({ action: "set_default" })
             });
             if (res.ok) {
-                fetchPersonas();
+                fetchPersonas(true);
             } else {
                 const data = await res.json();
                 setError(data.error || "Failed to set default");
@@ -130,7 +127,7 @@ export default function PersonasPage() {
         try {
             const res = await fetch(`/api/personas/${id}`, { method: "DELETE" });
             if (res.ok) {
-                fetchPersonas();
+                fetchPersonas(true);
             } else {
                 const data = await res.json();
                 setError(data.error || "Failed to delete persona");
@@ -155,8 +152,8 @@ export default function PersonasPage() {
                             <span className="text-lg font-semibold text-yt-text-primary">CommentAI</span>
                         </div>
                         <div className="hidden sm:flex items-center gap-4">
-                            <a href="/dashboard" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Dashboard</a>
-                            <a href="/dashboard/personas" className="text-sm font-medium text-yt-text-primary">Personas</a>
+                            <Link href="/dashboard" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Dashboard</Link>
+                            <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-primary">Personas</Link>
                         </div>
                     </div>
 
