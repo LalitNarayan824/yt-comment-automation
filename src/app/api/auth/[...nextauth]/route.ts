@@ -3,6 +3,50 @@ import GoogleProvider from "next-auth/providers/google";
 import type { AuthOptions } from "next-auth";
 import { saveOrUpdateUser } from "@/lib/services/user.service";
 
+/**
+ * Helper to refresh the access token with Google
+ */
+async function refreshAccessToken(token: any) {
+    try {
+        const url = "https://oauth2.googleapis.com/token";
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                client_id: process.env.GOOGLE_CLIENT_ID!,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+                grant_type: "refresh_token",
+                refresh_token: token.refreshToken,
+            }),
+        });
+
+        const refreshedTokens = await response.json();
+
+        if (!response.ok) throw refreshedTokens;
+
+        // Optional: Sync the refreshed token back to your database here 
+        // so your background ML worker always has the newest token.
+        await saveOrUpdateUser({
+            googleId: token.googleId,
+            email: token.email || token.user?.email || "",
+            name: token.name || token.user?.name || "",
+            accessToken: refreshedTokens.access_token,
+            // Google might not return a new refresh token; keep the old one
+            refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+        });
+
+        return {
+            ...token,
+            accessToken: refreshedTokens.access_token,
+            accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+            refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+        };
+    } catch (error) {
+        console.error("RefreshAccessTokenError:", error);
+        return { ...token, error: "RefreshAccessTokenError" };
+    }
+}
+
 export const authOptions: AuthOptions = {
     providers: [
         GoogleProvider({
@@ -21,21 +65,32 @@ export const authOptions: AuthOptions = {
     ],
     callbacks: {
         async jwt({ token, account, profile }) {
-            // On initial sign-in, persist the Google access token
-            if (account) {
-                token.accessToken = account.access_token;
-                token.refreshToken = account.refresh_token;
-                token.googleId = account.providerAccountId;
+            // Initial sign-in
+            if (account && profile) {
+                return {
+                    accessToken: account.access_token,
+                    accessTokenExpires: (account.expires_at ?? 0) * 1000,
+                    refreshToken: account.refresh_token,
+                    googleId: account.providerAccountId,
+                    user: {
+                        name: profile.name,
+                        email: profile.email,
+                    }
+                };
             }
-            if (profile) {
-                token.googleId = token.googleId || profile.sub;
+
+            // Return previous token if the access token has not expired yet
+            if (Date.now() < (token.accessTokenExpires as number)) {
+                return token;
             }
-            return token;
+
+            // Access token has expired, try to update it
+            return refreshAccessToken(token);
         },
         async session({ session, token }) {
-            // Make the access token available in the session
             session.accessToken = token.accessToken as string | undefined;
             session.googleId = token.googleId as string | undefined;
+            (session as any).error = token.error; // Pass error to client to handle re-login
             return session;
         },
     },
