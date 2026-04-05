@@ -4,15 +4,16 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { Channel, Video } from "@/types";
+import { useYouTubeStore } from "@/store/useYouTubeStore";
+import Link from "next/link";
 
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
 
-    const [channel, setChannel] = useState<Channel | null>(null);
-    const [videos, setVideos] = useState<Video[]>([]);
-    const [loadingChannel, setLoadingChannel] = useState<boolean>(true);
-    const [loadingVideos, setLoadingVideos] = useState<boolean>(true);
+    const { channel, videos, isChannelFetched, isVideosFetched, setChannel, setVideos } = useYouTubeStore();
+    const [loadingChannel, setLoadingChannel] = useState<boolean>(!isChannelFetched);
+    const [loadingVideos, setLoadingVideos] = useState<boolean>(!isVideosFetched);
     const [error, setError] = useState<string | null>(null);
 
     // Fetch channel info and videos on mount
@@ -20,6 +21,10 @@ export default function DashboardPage() {
         if (status !== "authenticated") return;
 
         const fetchChannel = async () => {
+            if (isChannelFetched) {
+                setLoadingChannel(false);
+                return;
+            }
             try {
                 const res = await fetch("/api/channel");
                 const data = await res.json();
@@ -36,6 +41,10 @@ export default function DashboardPage() {
         };
 
         const fetchVideos = async () => {
+            if (isVideosFetched) {
+                setLoadingVideos(false);
+                return;
+            }
             try {
                 const res = await fetch("/api/videos");
                 const data = await res.json();
@@ -51,7 +60,7 @@ export default function DashboardPage() {
 
         fetchChannel();
         fetchVideos();
-    }, [status]);
+    }, [status, isChannelFetched, isVideosFetched, setChannel, setVideos]);
 
     // Redirect to login if not authenticated
     if (status === "loading") {
@@ -103,8 +112,8 @@ export default function DashboardPage() {
                             </span>
                         </div>
                         <div className="hidden sm:flex items-center gap-4">
-                            <a href="/dashboard" className="text-sm font-medium text-yt-text-primary">Dashboard</a>
-                            <a href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</a>
+                            <Link href="/dashboard" className="text-sm font-medium text-yt-text-primary">Dashboard</Link>
+                            <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</Link>
                         </div>
                     </div>
 

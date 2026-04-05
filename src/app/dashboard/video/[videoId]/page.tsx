@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import type { Comment, Tone } from "@/types";
+import Link from "next/link";
 
 interface VideoContext {
     title: string;
@@ -248,8 +249,8 @@ export default function VideoCommentsPage() {
                                 <span className="text-lg font-semibold text-yt-text-primary">CommentAI</span>
                             </div>
                             <div className="hidden sm:flex items-center gap-4">
-                                <a href="/dashboard" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Dashboard</a>
-                                <a href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</a>
+                                <Link href="/dashboard" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Dashboard</Link>
+                                <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</Link>
                             </div>
                         </div>
                     </div>

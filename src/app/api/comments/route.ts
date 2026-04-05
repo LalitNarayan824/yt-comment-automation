@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await res.json();
-
+       
         // Sync comments to database
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ytComments = (data.items || []).map((item: any) => {
