@@ -440,7 +440,7 @@ const responseRate = (answered / questions) * 100;
 🤖 8. LLM Service
 async function callLLM(input) {
   const res = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "groq_model",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
