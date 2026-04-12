@@ -71,7 +71,7 @@ export default function PersonasPage() {
     }
 
     const handleSignOut = () => {
-        signOut({ callbackUrl: "/login" });
+        signOut({ callbackUrl: "/" });
     };
 
     const handleCreate = async (e: React.FormEvent) => {

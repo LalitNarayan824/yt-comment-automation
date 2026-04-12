@@ -47,7 +47,7 @@ export async function syncComments(videoId: string, comments: YouTubeComment[]) 
 /**
  * Get all comments for a video from the database, with their latest reply.
  */
-export async function getCommentsByVideoId(videoId: string, sort: 'recent' | 'priority' = 'recent') {
+export async function getCommentsByVideoId(videoId: string, sort: 'recent' | 'priority' = 'recent', cursor?: string | null, limit: number = 20) {
     return prisma.comment.findMany({
         where: { videoId },
         include: {
@@ -57,8 +57,11 @@ export async function getCommentsByVideoId(videoId: string, sort: 'recent' | 'pr
             },
         },
         orderBy: sort === 'priority'
-            ? [{ priorityScore: 'desc' }, { publishedAt: 'desc' }]
-            : { publishedAt: "desc" },
+            ? [{ priorityScore: 'desc' }, { publishedAt: 'desc' }, { id: 'asc' }]
+            : [{ publishedAt: "desc" }, { id: 'asc' }],
+        take: limit + 1,
+        cursor: cursor ? { id: cursor } : undefined,
+        skip: cursor ? 1 : 0,
     });
 }
 

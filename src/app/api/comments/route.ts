@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get("videoId");
+    const cursor = searchParams.get("cursor");
+    const limit = parseInt(searchParams.get("limit") || "20");
 
     if (!videoId) {
         return Response.json({ error: "videoId is required" }, { status: 400 });
@@ -28,54 +30,64 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Fetch comments from YouTube API
-        const res = await fetch(
-            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance`,
-            {
-                headers: {
-                    Authorization: `Bearer ${session.accessToken}`,
-                },
-            }
-        );
-
-        if (!res.ok) {
-            const error = await res.json();
-            return Response.json(
-                { error: error.error?.message || "Failed to fetch comments" },
-                { status: res.status }
+        // Only sync from YouTube and run AI analysis on the initial load (no cursor)
+        if (!cursor) {
+            // Fetch comments from YouTube API
+            const res = await fetch(
+                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=time`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${session.accessToken}`,
+                    },
+                }
             );
+
+            if (!res.ok) {
+                const error = await res.json();
+                return Response.json(
+                    { error: error.error?.message || "Failed to fetch comments" },
+                    { status: res.status }
+                );
+            }
+
+            const data = await res.json();
+
+            // Sync comments to database
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ytComments = (data.items || []).map((item: any) => {
+                const snippet = item.snippet.topLevelComment.snippet;
+                return {
+                    youtubeCommentId: item.snippet.topLevelComment.id,
+                    authorName: snippet.authorDisplayName,
+                    authorChannelId: snippet.authorChannelId?.value,
+                    authorProfileImage: snippet.authorProfileImageUrl,
+                    text: snippet.textDisplay,
+                    likeCount: snippet.likeCount || 0,
+                    totalReplyCount: item.snippet.totalReplyCount || 0,
+                    publishedAt: new Date(snippet.publishedAt),
+                };
+            });
+
+            await syncComments(dbVideo.id, ytComments);
+
+            // Run analysis on unprocessed comments
+            await analyzeUnprocessedComments(dbVideo.id);
         }
-
-        const data = await res.json();
-       
-        // Sync comments to database
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ytComments = (data.items || []).map((item: any) => {
-            const snippet = item.snippet.topLevelComment.snippet;
-            return {
-                youtubeCommentId: item.snippet.topLevelComment.id,
-                authorName: snippet.authorDisplayName,
-                authorChannelId: snippet.authorChannelId?.value,
-                authorProfileImage: snippet.authorProfileImageUrl,
-                text: snippet.textDisplay,
-                likeCount: snippet.likeCount || 0,
-                totalReplyCount: item.snippet.totalReplyCount || 0,
-                publishedAt: new Date(snippet.publishedAt),
-            };
-        });
-
-        await syncComments(dbVideo.id, ytComments);
-
-        // Run analysis on unprocessed comments
-        await analyzeUnprocessedComments(dbVideo.id);
 
         // Return comments from the database (source of truth)
         const sort = request.nextUrl.searchParams.get('sort') === 'priority' ? 'priority' : 'recent';
-        const comments = await getCommentsByVideoId(dbVideo.id, sort);
+        const commentsRaw = await getCommentsByVideoId(dbVideo.id, sort, cursor, limit);
+
+        let nextCursor = null;
+        if (commentsRaw.length > limit) {
+            const lastItem = commentsRaw.pop();
+            nextCursor = lastItem!.id;
+        }
 
         return Response.json({
-            comments,
-            totalResults: comments.length,
+            comments: commentsRaw,
+            nextCursor,
+            totalResults: commentsRaw.length,
         });
     } catch {
         return Response.json(

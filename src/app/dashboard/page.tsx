@@ -77,7 +77,7 @@ export default function DashboardPage() {
     }
 
     const handleSignOut = () => {
-        signOut({ callbackUrl: "/login" });
+        signOut({ callbackUrl: "/" });
     };
 
     const handleSelectVideo = (videoId: string) => {
