@@ -32,6 +32,7 @@ export default function VideoCommentsPage() {
     const [posting, setPosting] = useState<Record<string, boolean>>({});
     const [postError, setPostError] = useState<Record<string, string | null>>({});
     const [fetched, setFetched] = useState<boolean>(false);
+    const [syncing, setSyncing] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [tone, setTone] = useState<Tone>("friendly");
     const [genError, setGenError] = useState<Record<string, string | null>>({});
@@ -137,6 +138,30 @@ export default function VideoCommentsPage() {
             } else {
                 setLoadingMore(false);
             }
+        }
+    };
+
+    const handleRefresh = async () => {
+        setSyncing(true);
+        setError(null);
+
+        try {
+            // 1. Sync new comments from YouTube + run AI analysis
+            const syncRes = await fetch(`/api/comments/sync?videoId=${videoId}`, { method: "POST" });
+            const syncData = await syncRes.json();
+
+            if (!syncRes.ok) {
+                setError(syncData.error || "Failed to sync comments");
+                setSyncing(false);
+                return;
+            }
+
+            // 2. Reload all comments from DB
+            await handleFetchComments(true);
+        } catch {
+            setError("Network error — failed to sync comments");
+        } finally {
+            setSyncing(false);
         }
     };
 
@@ -317,11 +342,11 @@ export default function VideoCommentsPage() {
                             Analytics
                         </button>
                         <button
-                            onClick={() => handleFetchComments(true)}
-                            disabled={loading}
+                            onClick={handleRefresh}
+                            disabled={loading || syncing}
                             className="text-sm bg-yt-blue hover:bg-yt-blue-hover text-white font-medium px-3 py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50"
                         >
-                            {loading ? "Refreshing..." : "↻ Refresh"}
+                            {syncing ? "Syncing..." : loading ? "Refreshing..." : "↻ Refresh"}
                         </button>
                     </div>
                 </div>
@@ -432,8 +457,17 @@ export default function VideoCommentsPage() {
                 )}
 
                 {/* Loading Skeleton */}
-                {loading && (
+                {(loading || syncing) && (
                     <div className="space-y-4">
+                        {syncing && (
+                            <div className="bg-yt-bg-surface border border-yt-border rounded-lg p-4 flex items-center gap-3">
+                                <svg className="w-5 h-5 animate-spin text-yt-blue" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                <span className="text-sm text-yt-text-secondary">Syncing new comments from YouTube & running AI analysis…</span>
+                            </div>
+                        )}
                         {[1, 2, 3, 4, 5].map((i) => (
                             <div
                                 key={i}
@@ -453,7 +487,7 @@ export default function VideoCommentsPage() {
                 )}
 
                 {/* Empty State */}
-                {fetched && !loading && comments.length === 0 && !error && (
+                {fetched && !loading && !syncing && comments.length === 0 && !error && (
                     <div className="bg-yt-bg-surface rounded-lg border border-yt-border p-12 text-center">
                         <svg
                             className="w-16 h-16 mx-auto text-yt-icon-muted mb-4"
@@ -468,9 +502,16 @@ export default function VideoCommentsPage() {
                                 d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
                             />
                         </svg>
-                        <p className="text-sm text-yt-text-secondary">
-                            No comments found for this video
+                        <p className="text-sm text-yt-text-secondary mb-3">
+                            No comments to show
                         </p>
+                        <button
+                            onClick={handleRefresh}
+                            disabled={syncing}
+                            className="text-sm bg-yt-blue hover:bg-yt-blue-hover text-white font-medium px-4 py-2 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                            ↻ Refresh to sync new comments
+                        </button>
                     </div>
                 )}
 
@@ -615,7 +656,7 @@ export default function VideoCommentsPage() {
                                             {/* Actions */}
                                             <div className="space-y-3">
                                                 {/* Show existing reply if already replied in DB */}
-                                                {(comment.replied || (comment.replies && comment.replies.length > 0)) && !replies[comment.id] ? (
+                                                {(comment.replies && comment.replies.length > 0 && comment.replies[0]?.posted) && !replies[comment.id] ? (
                                                     <div className="bg-yt-bg-elevated rounded-lg p-3 border border-yt-border">
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <div className="w-5 h-5 bg-yt-blue rounded-full flex items-center justify-center">
@@ -623,10 +664,10 @@ export default function VideoCommentsPage() {
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                 </svg>
                                                             </div>
-                                                            <span className="text-xs font-medium text-yt-text-primary">AI Replied</span>
+                                                            <span className="text-xs font-medium text-yt-text-primary">{comment.replies?.[0]?.posted ? "Posted to YouTube" : "💬 Reply Generated"}</span>
                                                         </div>
                                                         <p className="text-sm text-yt-text-secondary">
-                                                            {comment.replies?.[0]?.posted ? comment.replies[0].editedReply || comment.replies[0].generatedReply : "Reply was posted to YouTube."}
+                                                            {comment.replies?.[0]?.editedReply || comment.replies?.[0]?.generatedReply || "No reply text available."}
                                                         </p>
                                                     </div>
                                                 ) : (
