@@ -45,6 +45,80 @@ export async function syncComments(videoId: string, comments: YouTubeComment[]) 
 }
 
 /**
+ * Incrementally sync only NEW comments from YouTube that are not already in the DB.
+ * Uses early-stop dedup: fetches newest-first, stops when hitting a known comment.
+ * Returns the number of new comments synced.
+ */
+export async function syncNewCommentsFromYouTube(
+    dbVideoId: string,
+    youtubeVideoId: string,
+    accessToken: string
+): Promise<number> {
+    // Preload existing YouTube comment IDs for fast lookup
+    const existingComments = await prisma.comment.findMany({
+        where: { videoId: dbVideoId },
+        select: { youtubeCommentId: true },
+    });
+    const existingIds = new Set(existingComments.map(c => c.youtubeCommentId));
+
+    const newComments: YouTubeComment[] = [];
+    let nextPageToken: string | null = null;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        const pageParam: string = nextPageToken ? `&pageToken=${nextPageToken}` : '';
+        const res: Response = await fetch(
+            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${youtubeVideoId}&maxResults=50&order=time${pageParam}`,
+            {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            }
+        );
+
+        if (!res.ok) {
+            console.error(`YouTube API error during sync: ${res.status}`);
+            break;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await res.json();
+        const items = data.items || [];
+
+        let stop = false;
+        for (const item of items) {
+            const commentId = item.snippet.topLevelComment.id;
+
+            if (existingIds.has(commentId)) {
+                stop = true;
+                break; // Reached old comments — everything after is already in DB
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const snippet = (item as any).snippet.topLevelComment.snippet;
+            newComments.push({
+                youtubeCommentId: commentId,
+                authorName: snippet.authorDisplayName,
+                authorChannelId: snippet.authorChannelId?.value,
+                authorProfileImage: snippet.authorProfileImageUrl,
+                text: snippet.textDisplay,
+                likeCount: snippet.likeCount || 0,
+                totalReplyCount: item.snippet.totalReplyCount || 0,
+                publishedAt: new Date(snippet.publishedAt),
+            });
+        }
+
+        if (stop || !data.nextPageToken) break;
+        nextPageToken = data.nextPageToken;
+    }
+
+    // Save new comments to DB
+    if (newComments.length > 0) {
+        await syncComments(dbVideoId, newComments);
+    }
+
+    return newComments.length;
+}
+
+/**
  * Get all comments for a video from the database, with their latest reply.
  */
 export async function getCommentsByVideoId(videoId: string, sort: 'recent' | 'priority' = 'recent', cursor?: string | null, limit: number = 20) {
@@ -75,7 +149,7 @@ export async function getCommentByYoutubeId(youtubeCommentId: string) {
 /**
  * Process unanalyzed comments for a specific video using ML service in batches
  */
-export async function analyzeUnprocessedComments(videoId: string) {
+export async function analyzeUnprocessedComments(videoId: string, accessToken?: string | null) {
     const unanalyzedComments = await prisma.comment.findMany({
         where: {
             videoId,
@@ -123,26 +197,31 @@ export async function analyzeUnprocessedComments(videoId: string) {
 
                 const modResult = moderateComment(aiResult.toxicity, aiResult.is_spam);
 
-                let priorityScore = (comment.likeCount || 0) * 2;
-                if (aiResult.intent === 'question') priorityScore += 3;
-                else if (aiResult.intent === 'criticism') priorityScore += 2;
-                else if (aiResult.intent === 'praise' || aiResult.intent === 'appreciation') priorityScore += 1;
+                let priorityScore = getPriorityScore(aiResult.intent, aiResult.sentiment, comment.likeCount);
 
-                if (aiResult.sentiment === 'negative') priorityScore += 2;
-                else if (aiResult.sentiment === 'positive') priorityScore += 1;
+                // we auto reply if the sentiment is positive and intent is appreciation and comment length is less than 10 words
+                // we only auto reply to 75 % of these comments
+                // we only auto reply if the comment is not replied already by us
+                let isReplied = false
+                if (aiResult.sentiment === 'positive' && aiResult.intent === 'appreciation' && comment.text.split(' ').length < 13 && accessToken && Math.random() < 0.75) {
+                    isReplied = await AutoReply(comment, accessToken);
+                }
 
                 await prisma.comment.update({
                     where: { id: comment.id },
                     data: {
                         intent: aiResult.intent,
                         sentiment: aiResult.sentiment,
-                        toxicityScore: aiResult.toxicity,
+
+                        isToxic: modResult.is_toxic,
+
                         priorityScore,
                         isAnalyzed: true,
                         analyzedAt: new Date(),
                         isSpam: modResult.is_spam,
                         moderationStatus: modResult.moderation_status,
                         isModerated: modResult.is_moderated,
+                        ...(isReplied ? { replied: true } : {}),
                     },
                 });
             }
@@ -153,3 +232,118 @@ export async function analyzeUnprocessedComments(videoId: string) {
     }
 }
 
+async function AutoReply(
+    comment: { id: string; text: string; youtubeCommentId: string },
+
+    accessToken?: string | null
+): Promise<boolean> {
+
+    const replies = [
+        "❤️",
+        "🙌",
+        "🔥",
+        "😊",
+        "🙏",
+
+        "Thanks!",
+        "Appreciate it!",
+        "Means a lot!",
+        "Glad you liked it!",
+        "So glad! 😊",
+
+        "❤️ Thanks!",
+        "🙌 Appreciate it!",
+        "🔥 Means a lot!",
+        "😊 Glad you enjoyed it!",
+        "🙏 Thanks a lot!",
+
+        "Really appreciate it!",
+        "Happy you liked it!",
+
+        "Thanks for the support!",
+
+    ];
+    const autoReplyText = replies[Math.floor(Math.random() * replies.length)];
+
+    try {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/comments?part=snippet", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                snippet: {
+                    parentId: comment.youtubeCommentId, // Must be the YouTube Comment ID
+                    textOriginal: autoReplyText,
+                },
+            }),
+        });
+
+        if (res.ok) {
+            await prisma.reply.create({
+                data: {
+                    commentId: comment.id,
+                    generatedReply: autoReplyText,
+                    posted: true,
+                    postedAt: new Date(),
+                }
+            });
+            return true;
+        } else {
+            console.error("Failed to auto-reply to comment:", await res.text());
+            return false;
+        }
+    } catch (error) {
+        console.error("Error auto-replying:", error);
+        return false;
+    }
+
+}
+
+const getPriorityScore = (intent: string, sentiment: string, likeCount: number): number => {
+    let priorityScore = 0;
+
+    // 1. INTENT (Primary driver)
+    switch (intent) {
+        case 'question':
+            priorityScore += 5;
+            break;
+        case 'complaint':
+
+            priorityScore += 4;
+            break;
+        case 'appreciation':
+
+            priorityScore += 1;
+            break;
+        default:
+            priorityScore += 0;
+    }
+
+    // 2. SENTIMENT (Urgency modifier)
+    switch (sentiment) {
+        case 'negative':
+            priorityScore += 3;
+            break;
+        case 'positive':
+            priorityScore += 1;
+            break;
+    }
+
+    // 3. ENGAGEMENT (log scale to avoid dominance)
+    const likes = likeCount || 0;
+    priorityScore += Math.log2(likes + 1) * 2;
+
+    // 4. BONUS: Question + Negative = VERY IMPORTANT
+    if (intent === 'question' && sentiment === 'negative') {
+        priorityScore += 2;
+    }
+
+    // 5. PENALTY: Appreciation (we auto-reply anyway)
+    if (intent === 'appreciation') {
+        priorityScore -= 2;
+    }
+
+    return priorityScore;
+}

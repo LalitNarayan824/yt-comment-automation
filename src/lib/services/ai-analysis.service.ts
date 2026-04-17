@@ -1,5 +1,5 @@
+// *************THIS IS OF NO USE NOW
 import Groq from "groq-sdk";
-
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
 });
@@ -7,7 +7,7 @@ const groq = new Groq({
 export interface CommentAnalysisResult {
     intent: string;
     sentiment: string;
-    toxicityScore: number;
+    isToxic: boolean;
 }
 
 const MAX_RETRIES = 3;
@@ -18,7 +18,7 @@ export async function analyzeComment(text: string): Promise<CommentAnalysisResul
     Analyze the following YouTube comment and return ONLY a valid JSON object without markdown formatting or surrounding backticks. The JSON must have these exact keys:
     - "intent" (question, appreciation, complaint, spam, other)
     - "sentiment" (positive, negative, neutral)
-    - "toxicityScore" (float between 0.0 and 1.0)
+    - "isToxic" (boolean, true if toxic, false otherwise)
   
     Comment: "${text}"
     `;
@@ -49,7 +49,7 @@ export async function analyzeComment(text: string): Promise<CommentAnalysisResul
             return {
                 intent: parsed.intent || "other",
                 sentiment: parsed.sentiment || "neutral",
-                toxicityScore: typeof parsed.toxicityScore === "number" ? parsed.toxicityScore : 0.0
+                isToxic: typeof parsed.isToxic === "boolean" ? parsed.isToxic : false
             };
 
         } catch (error: any) {
@@ -70,7 +70,7 @@ export async function analyzeComment(text: string): Promise<CommentAnalysisResul
                 return {
                     intent: "other",
                     sentiment: "neutral",
-                    toxicityScore: 0.0
+                    isToxic: false
                 };
             }
         }
@@ -79,6 +79,6 @@ export async function analyzeComment(text: string): Promise<CommentAnalysisResul
     return {
         intent: "other",
         sentiment: "neutral",
-        toxicityScore: 0.0
+        isToxic: false
     };
 }
