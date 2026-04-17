@@ -73,7 +73,7 @@ model Comment {
   // Future-proofing fields
   intent           String?
   sentiment        String?
-  toxicityScore    Float?   @map("toxicity_score")
+  isToxic          Boolean  @default(false) @map("is_toxic")
   isAnalyzed       Boolean  @default(false) @map("is_analyzed")
   analyzedAt       DateTime? @map("analyzed_at")
   isSpam           Boolean  @default(false) @map("is_spam")

@@ -93,7 +93,7 @@ if (!comment.isAnalyzed) {
     data: {
       intent: result.intent,
       sentiment: result.sentiment,
-      toxicityScore: result.toxicity,
+      isToxic: result.isToxic,
       isAnalyzed: true,
       analyzedAt: new Date()
     }
@@ -126,7 +126,7 @@ flow :
 5. Update comment with:
    - intent
    - sentiment
-   - toxicityScore
+   - isToxic
    - isAnalyzed = true
 6. Use this data in later stages
 
@@ -155,7 +155,7 @@ Output:
 {
   "intent": "question",
   "sentiment": "negative",
-  "toxicityScore": 0.2
+  "isToxic": false
 }
 🚀 Outcome of Phase 1
 

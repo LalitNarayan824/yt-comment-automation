@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
             await syncComments(dbVideo.id, ytComments);
 
             // Run analysis on unprocessed comments
-            await analyzeUnprocessedComments(dbVideo.id);
+            await analyzeUnprocessedComments(dbVideo.id, session.accessToken);
         }
 
         // Return comments from the database (source of truth)

@@ -75,7 +75,7 @@ export async function getCommentByYoutubeId(youtubeCommentId: string) {
 /**
  * Process unanalyzed comments for a specific video using ML service in batches
  */
-export async function analyzeUnprocessedComments(videoId: string) {
+export async function analyzeUnprocessedComments(videoId: string, accessToken?: string | null) {
     const unanalyzedComments = await prisma.comment.findMany({
         where: {
             videoId,
@@ -123,26 +123,31 @@ export async function analyzeUnprocessedComments(videoId: string) {
 
                 const modResult = moderateComment(aiResult.toxicity, aiResult.is_spam);
 
-                let priorityScore = (comment.likeCount || 0) * 2;
-                if (aiResult.intent === 'question') priorityScore += 3;
-                else if (aiResult.intent === 'criticism') priorityScore += 2;
-                else if (aiResult.intent === 'praise' || aiResult.intent === 'appreciation') priorityScore += 1;
+                let priorityScore = getPriorityScore(aiResult.intent, aiResult.sentiment, comment.likeCount);
 
-                if (aiResult.sentiment === 'negative') priorityScore += 2;
-                else if (aiResult.sentiment === 'positive') priorityScore += 1;
+                // we auto reply if the sentiment is positive and intent is appreciation and comment length is less than 10 words
+                // we only auto reply to 75 % of these comments
+                // we only auto reply if the comment is not replied already
+                let isReplied = false
+                if (aiResult.sentiment === 'positive' && aiResult.intent === 'appreciation' && comment.text.split(' ').length < 13 && accessToken && Math.random() < 0.75 && !comment.replied) {
+                    isReplied = await AutoReply(comment, accessToken);
+                }
 
                 await prisma.comment.update({
                     where: { id: comment.id },
                     data: {
                         intent: aiResult.intent,
                         sentiment: aiResult.sentiment,
-                        toxicityScore: aiResult.toxicity,
+
+                        isToxic: modResult.is_toxic,
+
                         priorityScore,
                         isAnalyzed: true,
                         analyzedAt: new Date(),
                         isSpam: modResult.is_spam,
                         moderationStatus: modResult.moderation_status,
                         isModerated: modResult.is_moderated,
+                        ...(isReplied ? { replied: true } : {}),
                     },
                 });
             }
@@ -153,3 +158,118 @@ export async function analyzeUnprocessedComments(videoId: string) {
     }
 }
 
+async function AutoReply(
+    comment: { id: string; text: string; youtubeCommentId: string },
+
+    accessToken?: string | null
+): Promise<boolean> {
+
+    const replies = [
+        "❤️",
+        "🙌",
+        "🔥",
+        "😊",
+        "🙏",
+
+        "Thanks!",
+        "Appreciate it!",
+        "Means a lot!",
+        "Glad you liked it!",
+        "So glad! 😊",
+
+        "❤️ Thanks!",
+        "🙌 Appreciate it!",
+        "🔥 Means a lot!",
+        "😊 Glad you enjoyed it!",
+        "🙏 Thanks a lot!",
+
+        "Really appreciate it!",
+        "Happy you liked it!",
+
+        "Thanks for the support!",
+
+    ];
+    const autoReplyText = replies[Math.floor(Math.random() * replies.length)];
+
+    try {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/comments?part=snippet", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                snippet: {
+                    parentId: comment.youtubeCommentId, // Must be the YouTube Comment ID
+                    textOriginal: autoReplyText,
+                },
+            }),
+        });
+
+        if (res.ok) {
+            await prisma.reply.create({
+                data: {
+                    commentId: comment.id,
+                    generatedReply: autoReplyText,
+                    posted: true,
+                    postedAt: new Date(),
+                }
+            });
+            return true;
+        } else {
+            console.error("Failed to auto-reply to comment:", await res.text());
+            return false;
+        }
+    } catch (error) {
+        console.error("Error auto-replying:", error);
+        return false;
+    }
+
+}
+
+const getPriorityScore = (intent: string, sentiment: string, likeCount: number): number => {
+    let priorityScore = 0;
+
+    // 1. INTENT (Primary driver)
+    switch (intent) {
+        case 'question':
+            priorityScore += 5;
+            break;
+        case 'complaint':
+
+            priorityScore += 4;
+            break;
+        case 'appreciation':
+
+            priorityScore += 1;
+            break;
+        default:
+            priorityScore += 0;
+    }
+
+    // 2. SENTIMENT (Urgency modifier)
+    switch (sentiment) {
+        case 'negative':
+            priorityScore += 3;
+            break;
+        case 'positive':
+            priorityScore += 1;
+            break;
+    }
+
+    // 3. ENGAGEMENT (log scale to avoid dominance)
+    const likes = likeCount || 0;
+    priorityScore += Math.log2(likes + 1) * 2;
+
+    // 4. BONUS: Question + Negative = VERY IMPORTANT
+    if (intent === 'question' && sentiment === 'negative') {
+        priorityScore += 2;
+    }
+
+    // 5. PENALTY: Appreciation (we auto-reply anyway)
+    if (intent === 'appreciation') {
+        priorityScore -= 2;
+    }
+
+    return priorityScore;
+}

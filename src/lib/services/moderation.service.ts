@@ -1,7 +1,7 @@
 export interface ModerationResult {
-    toxicity_score: number;
+    is_toxic: boolean;
     is_spam: boolean;
-    moderation_status: "approved" | "flagged" | "blocked" | "pending";
+    moderation_status: "approved"| "blocked" ;
     is_moderated: boolean;
 }
 
@@ -30,20 +30,18 @@ export interface ModerationResult {
 // }
 
 /**
- * Moderate a comment given its ML toxicity score, and ML spam detection
+ * Moderate a comment given its isToxic , and isSpam
  */
-export function moderateComment( toxicityScore: number, isSpamML: boolean = false): ModerationResult {
-    const isSpam = isSpamML;
-    let status: "approved" | "flagged" | "blocked" | "pending" = "approved";
+export function moderateComment(toxicity: boolean, isSpam: boolean = false): ModerationResult {
+   
+    let status: "approved" | "blocked" = "approved";
 
-    if (toxicityScore > 0.65) {
+    if (toxicity || isSpam) {
         status = "blocked";
-    } else if (isSpam) {
-        status = "flagged";
     }
 
     return {
-        toxicity_score: toxicityScore,
+        is_toxic: toxicity,
         is_spam: isSpam,
         moderation_status: status,
         is_moderated: true,

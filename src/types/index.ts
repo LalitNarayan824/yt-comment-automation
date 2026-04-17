@@ -21,6 +21,10 @@ export interface Comment {
     publishedAt: string | Date;
     replied: boolean;
     replies?: Reply[];
+    isToxic: boolean;
+    isSpam: boolean;
+    moderationStatus: string;
+    priorityScore: number;
 }
 
 export interface Reply {

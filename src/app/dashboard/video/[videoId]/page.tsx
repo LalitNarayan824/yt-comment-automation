@@ -578,9 +578,9 @@ export default function VideoCommentsPage() {
                                                                 }`}>
                                                                 {comment.moderationStatus?.toUpperCase()}
                                                             </span>
-                                                            {(comment.toxicityScore !== null && comment.toxicityScore !== undefined) && (
-                                                                <span className="text-[10px] bg-yt-bg-elevated text-yt-text-secondary px-1.5 py-0.5 rounded border border-yt-border">
-                                                                    Toxicity: {(comment.toxicityScore * 100).toFixed(0)}%
+                                                            {comment.isToxic && (
+                                                                <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">
+                                                                    TOXIC
                                                                 </span>
                                                             )}
                                                             {comment.isSpam && (
