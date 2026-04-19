@@ -23,8 +23,14 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // Creator context for AI insights
+  contentCategory     String @default("education") @map("content_category")
+  contentType         String @default("Web Development") @map("content_type")
+  audienceExpectation String @default("high interaction") @map("audience_expectation")
+
   videos   Video[]
   personas Persona[]
+  insights Insight[]
 
   @@map("users")
 }
@@ -129,4 +135,20 @@ model Persona {
 
   @@index([userId])
   @@map("personas")
+}
+
+// ──────────────────────────────────────────────
+// Insights Table (AI Checkpoint System)
+// ──────────────────────────────────────────────
+model Insight {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  inputData  Json     @map("input_data")
+  outputData Json     @map("output_data")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("insights")
 }
