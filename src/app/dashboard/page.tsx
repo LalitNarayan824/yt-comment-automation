@@ -130,6 +130,7 @@ export default function DashboardPage() {
                         <div className="hidden sm:flex items-center gap-4">
                             <Link href="/dashboard" className="text-sm font-medium text-yt-text-primary">Dashboard</Link>
                             <Link href="/dashboard/insights" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Insights</Link>
+                            <Link href="/dashboard/search" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Search</Link>
                             <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</Link>
                         </div>
                     </div>
