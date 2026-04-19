@@ -282,6 +282,34 @@ export default function InsightsPage() {
                                     {aiInsights.actionLinks.map((link, i) => (
                                         <button
                                             key={i}
+                                            onClick={() => {
+                                                // Parse "key:value" filter format into search params
+                                                const params = new URLSearchParams();
+                                                const parts = link.filter.split(":");
+                                                if (parts.length === 2) {
+                                                    const [key, value] = parts;
+                                                    // Map LLM filter keys to search page param names
+                                                    const paramMap: Record<string, string> = {
+                                                        intent: "intent",
+                                                        sentiment: "sentiment",
+                                                        priority: "priority",
+                                                        moderation: "moderation",
+                                                        replied: "replied",
+                                                        isSpam: "isSpam",
+                                                        isToxic: "isToxic",
+                                                    };
+                                                    const paramKey = paramMap[key] || key;
+                                                    // Handle special cases
+                                                    if (key === "priority" && value === "high") {
+                                                        // No direct priority filter, search for high priority
+                                                    } else if (key === "moderation" && value === "flagged") {
+                                                        params.set("isToxic", "true");
+                                                    } else {
+                                                        params.set(paramKey, value);
+                                                    }
+                                                }
+                                                router.push(`/dashboard/search?${params.toString()}`);
+                                            }}
                                             className="text-xs bg-yt-bg-elevated border border-yt-border px-3 py-1.5 rounded-full text-yt-blue hover:bg-yt-blue hover:text-white transition-colors cursor-pointer"
                                         >
                                             {link.label}
@@ -461,6 +489,7 @@ function NavBar({ session }: { session: any }) {
                     <div className="hidden sm:flex items-center gap-4">
                         <Link href="/dashboard" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Dashboard</Link>
                         <Link href="/dashboard/insights" className="text-sm font-medium text-yt-text-primary">Insights</Link>
+                        <Link href="/dashboard/search" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Search</Link>
                         <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</Link>
                     </div>
                 </div>
