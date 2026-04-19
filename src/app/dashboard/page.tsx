@@ -15,6 +15,7 @@ export default function DashboardPage() {
     const [loadingChannel, setLoadingChannel] = useState<boolean>(!isChannelFetched);
     const [loadingVideos, setLoadingVideos] = useState<boolean>(!isVideosFetched);
     const [error, setError] = useState<string | null>(null);
+    const [userSettings, setUserSettings] = useState<{ contentCategory: string; contentType: string; audienceExpectation: string } | null>(null);
 
     // Fetch channel info and videos on mount
     useEffect(() => {
@@ -60,6 +61,11 @@ export default function DashboardPage() {
 
         fetchChannel();
         fetchVideos();
+
+        // Fetch user settings
+        fetch("/api/user/settings").then(r => r.ok ? r.json() : null).then(data => {
+            if (data) setUserSettings(data);
+        });
     }, [status, isChannelFetched, isVideosFetched, setChannel, setVideos]);
 
     // Redirect to login if not authenticated
@@ -82,6 +88,16 @@ export default function DashboardPage() {
 
     const handleSelectVideo = (videoId: string) => {
         router.push(`/dashboard/video/${videoId}`);
+    };
+
+    const handleUpdateSetting = async (key: string, value: string) => {
+        if (!userSettings) return;
+        setUserSettings({ ...userSettings, [key]: value });
+        await fetch("/api/user/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [key]: value }),
+        });
     };
 
     const formatCount = (count: string) => {
@@ -113,6 +129,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="hidden sm:flex items-center gap-4">
                             <Link href="/dashboard" className="text-sm font-medium text-yt-text-primary">Dashboard</Link>
+                            <Link href="/dashboard/insights" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Insights</Link>
                             <Link href="/dashboard/personas" className="text-sm font-medium text-yt-text-secondary hover:text-yt-text-primary transition-colors">Personas</Link>
                         </div>
                     </div>
@@ -227,6 +244,46 @@ export default function DashboardPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Channel Context Settings */}
+                        {userSettings && (
+                            <div className="bg-yt-bg-surface rounded-lg border border-yt-border p-5 mt-4">
+                                <h3 className="text-sm font-semibold text-yt-text-primary mb-3">Channel Context</h3>
+                                <p className="text-xs text-yt-text-secondary mb-4">Used by AI Insights for better recommendations</p>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs text-yt-text-secondary block mb-1">Category</label>
+                                        <select
+                                            value={userSettings.contentCategory}
+                                            onChange={(e) => handleUpdateSetting("contentCategory", e.target.value)}
+                                            className="w-full text-sm bg-yt-bg-elevated border border-yt-border rounded-md px-2 py-1.5 text-yt-text-primary"
+                                        >
+                                            {["education", "tech", "gaming", "entertainment", "vlog", "music", "news"].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-yt-text-secondary block mb-1">Content Type</label>
+                                        <select
+                                            value={userSettings.contentType}
+                                            onChange={(e) => handleUpdateSetting("contentType", e.target.value)}
+                                            className="w-full text-sm bg-yt-bg-elevated border border-yt-border rounded-md px-2 py-1.5 text-yt-text-primary"
+                                        >
+                                            {["Programming Tutorials", "Web Development", "AI / Machine Learning", "Tech Reviews", "Gaming Walkthroughs", "Comedy", "Travel Vlogs", "Music Production", "News & Politics", "Lifestyle"].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-yt-text-secondary block mb-1">Audience Expectation</label>
+                                        <select
+                                            value={userSettings.audienceExpectation}
+                                            onChange={(e) => handleUpdateSetting("audienceExpectation", e.target.value)}
+                                            className="w-full text-sm bg-yt-bg-elevated border border-yt-border rounded-md px-2 py-1.5 text-yt-text-primary"
+                                        >
+                                            {["high interaction", "moderate interaction", "low interaction"].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* RIGHT — Videos Grid */}
