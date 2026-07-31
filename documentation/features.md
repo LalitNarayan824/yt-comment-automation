@@ -322,7 +322,7 @@ The `buildLLMInput()` function assembles a rich context payload for the Groq LLM
 ### Structured Output
 
 The LLM returns a structured JSON response with:
-
+`
 | Field | Description |
 |---|---|
 | `vibeCheck` | One of: 🔥 Excellent, 🟢 Good, ⚠️ Needs Attention, 🚨 Critical |

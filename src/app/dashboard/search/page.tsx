@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -33,7 +33,7 @@ interface CommentResult {
 const SENTIMENTS = ["positive", "negative", "neutral"];
 const INTENTS = ["question", "appreciation", "criticism"];
 
-export default function SearchPage() {
+function SearchPageContent() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const urlParams = useSearchParams();
@@ -399,6 +399,18 @@ export default function SearchPage() {
                 )}
             </main>
         </div>
+    );
+}
+
+export default function SearchPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-yt-bg-page flex items-center justify-center">
+                <p className="text-sm text-yt-text-secondary">Loading search...</p>
+            </div>
+        }>
+            <SearchPageContent />
+        </Suspense>
     );
 }
 
