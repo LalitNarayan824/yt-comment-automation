@@ -11,15 +11,12 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): PrismaClient {
     const pool = globalForPrisma.pgPool ?? new pg.Pool({ connectionString });
-    if (process.env.NODE_ENV !== "production") {
-        globalForPrisma.pgPool = pool;
-    }
+    globalForPrisma.pgPool = pool;
     const adapter = new PrismaPg(pool as any);
     return new PrismaClient({ adapter });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
+
